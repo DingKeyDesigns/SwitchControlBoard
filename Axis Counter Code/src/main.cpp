@@ -1,14 +1,13 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
+#include <SPI.h>
+#include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncTCP.h>
 #include <Rotary.h>
-#include <Wire.h>
-#include <SPI.h>
-
 
 // SCL GPIO5
 // SDA GPIO4
@@ -19,7 +18,6 @@ Adafruit_SSD1306 display(OLED_RESET);
 #define XPOS 0
 #define YPOS 1
 #define DELTAY 2
-
 
 #define LOGO16_GLCD_HEIGHT 16
 #define LOGO16_GLCD_WIDTH  16
