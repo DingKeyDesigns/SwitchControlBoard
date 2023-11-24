@@ -54,11 +54,12 @@ unsigned long Encoder_delta =  0;
 unsigned long micros_delta =  0;
 
 unsigned long Old_Cycles_done = 0;
-unsigned long requestedCycles = 0;
+volatile unsigned long requestedCycles = 0;
+byte percent = 0;
 int requestFlag = 0;
 
 //Ticker t;
-int pwm = 255;
+byte pwm = 255;
 
 unsigned long last_millis = 0;
 
@@ -68,6 +69,9 @@ const char *password = APPSK;
 //String ssidRand = APSSID;
 char ssidRand[25];
 IPAddress myIP;
+IPAddress local_IP(10,10,10,1);
+IPAddress gateway(10,10,1,1);
+IPAddress subnet(255,255,255,0);
 
 const char* PARAM_INPUT_1 = "pwm";
 const char* PARAM_INPUT_2 = "cycles";
@@ -76,7 +80,7 @@ const char* PARAM_INPUT_3 = "input3";
 String inputMessageFinal = "testMessage";
 
 // HTML web page to handle 3 input fields (input1, input2, input3)
-const char index_html[] PROGMEM = R"rawliteral(
+/*const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html><head>
   <title>ESP Input Form</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -91,6 +95,19 @@ const char index_html[] PROGMEM = R"rawliteral(
   </form><br>
   <form action="/get">
     input3: <input type="text" name="input3">
+    <input type="submit" value="Submit">
+  </form>
+</body></html>)rawliteral";
+*/
+const char index_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE HTML><html><head>
+  <title>ESP Input Form</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head><body>
+  <form action="/get">
+    Speed Percentage (0-100)<input type="number" name="pwm" min="0" max="100"><br>
+    Cycles to Run<input type="number" name="cycles" min="1"><br>
+    placeholder<input type="number" name="input3"><br><br>
     <input type="submit" value="Submit">
   </form>
 </body></html>)rawliteral";
@@ -109,7 +126,7 @@ void notFound(AsyncWebServerRequest *request) {
   request->send(404, "text/plain", "Not found");
 }
 
-ICACHE_RAM_ATTR void doMotorEncoder() {
+IRAM_ATTR void doMotorEncoder() {
   unsigned char mresult = r.process();
   if (mresult == DIR_CW) {
     MotorEncoderPos++;
@@ -152,11 +169,12 @@ void setup() {
 
   Serial.print("Configuring access point...");
   int randSSID = random(1,9999);
-  snprintf(ssidRand,25,"%s-%04d",APSSID,randSSID);
+  snprintf(ssidRand,25,"%s-%04d",APSSID,1);
   Serial.println(ssidRand);
   //ssidRand = ssidRand + randSSID;
   //ssid = ssidRand;
   /* You can remove the password parameter if you want the AP to be open. */
+  WiFi.softAPConfig(local_IP, gateway, subnet);
   WiFi.softAP(ssidRand, password);
 
   myIP = WiFi.softAPIP();
@@ -176,24 +194,34 @@ void setup() {
     String inputB;
     String inputC;
     String inputParam;
+    String inputParam1;
+    String inputParam2;
+    String inputParam3;
     // GET input1 value on <ESP_IP>/get?input1=<inputMessage>
     if (request->hasParam(PARAM_INPUT_1)) {
       inputA = request->getParam(PARAM_INPUT_1)->value();
-      inputParam = PARAM_INPUT_1;
-      pwm = inputA.toInt();
+      if (inputA[0] != '\0') {
+        percent = inputA.toInt();
+        inputParam1 = PARAM_INPUT_1;
+        requestFlag = 1;
+        pwm = (float)percent / 100 * 255;
+      }
       analogWrite(D7, pwm);
     }
     // GET input2 value on <ESP_IP>/get?input2=<inputMessage>
-    else if (request->hasParam(PARAM_INPUT_2)) {
+    if (request->hasParam(PARAM_INPUT_2)) {
       inputB = request->getParam(PARAM_INPUT_2)->value();
-      inputParam = PARAM_INPUT_2;
-      requestFlag = 1;
-      requestedCycles = inputB.toInt();
+      if (inputB[0] != '\0') {
+        inputParam2 = PARAM_INPUT_2;
+        requestFlag = 1;
+        requestedCycles = inputB.toInt();
+      }
     }
     // GET input3 value on <ESP_IP>/get?input3=<inputMessage>
-    else if (request->hasParam(PARAM_INPUT_3)) {
+    if (request->hasParam(PARAM_INPUT_3)) {
       inputC = request->getParam(PARAM_INPUT_3)->value();
-      inputParam = PARAM_INPUT_3;
+      inputParam3 = PARAM_INPUT_3;
+      requestFlag = 1;
     }
     else {
       inputA = "No message sent";
@@ -201,9 +229,12 @@ void setup() {
     }
     Serial.println(inputA);
     inputMessageFinal = inputA;
-    request->send(200, "text/html", "HTTP GET request sent to your ESP on input field (" 
-                                     + inputParam + ") with value: " + inputMessageFinal +
-                                     "<br><a href=\"/\">Return to Home Page</a>");
+    inputParam1 = "";
+    request->send(200, "text/html", "HTTP GET request sent to your ESP on input field <br>Speed Percentage: " 
+                                     + inputParam1 + percent + "<br>" 
+                                     + "Cycles to Run" + ": " + requestedCycles + "<br>"
+                                     + inputParam3 + ": " + inputC + "<br>"
+                                     + "<br><a href=\"/\">Return to Home Page</a>");
   });
   server.onNotFound(notFound);
   server.begin();
