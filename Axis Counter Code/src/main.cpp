@@ -59,7 +59,7 @@ byte percent = 0;
 int requestFlag = 0;
 
 //Ticker t;
-byte pwm = 255;
+byte pwm = 20;
 
 unsigned long last_millis = 0;
 
@@ -128,7 +128,7 @@ void notFound(AsyncWebServerRequest *request) {
 
 IRAM_ATTR void doMotorEncoder() {
   unsigned char mresult = r.process();
-  if (mresult == DIR_CW) {
+  if (mresult == DIR_CW || mresult == DIR_CCW) {
     MotorEncoderPos++;
     totalEncoderPos++;
     if (MotorEncoderPos >= STEPS_ROTATION) {  // 374=11 pulses per rev X 34 (gear ratio of the motor)
@@ -157,7 +157,9 @@ void setup() {
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, LOW); // LOW turns LED on
   
-  pinMode(ENABLE_PIN, OUTPUT);
+  Wire.begin();
+  
+  /*pinMode(ENABLE_PIN, OUTPUT);
   digitalWrite(ENABLE_PIN, HIGH);
   delay(2000);
   digitalWrite(ENABLE_PIN, LOW);
@@ -165,7 +167,7 @@ void setup() {
   digitalWrite(ENABLE_PIN, HIGH);
   delay(2000);
   digitalWrite(ENABLE_PIN, LOW);
-  delay(2000);
+  delay(2000);*/
 
   Serial.print("Configuring access point...");
   int randSSID = random(1,9999);
@@ -204,9 +206,15 @@ void setup() {
         percent = inputA.toInt();
         inputParam1 = PARAM_INPUT_1;
         requestFlag = 1;
-        pwm = (float)percent / 100 * 255;
+        //pwm = (float)percent / 100 * 255;
+        pwm = (1 - (float)percent / 100) * 127;
       }
-      analogWrite(D7, pwm);
+      //analogWrite(D7, pwm);
+      Wire.beginTransmission(0x2E);
+      Wire.write(byte(0x00));
+      Wire.write(pwm);
+      Wire.endTransmission();
+
     }
     // GET input2 value on <ESP_IP>/get?input2=<inputMessage>
     if (request->hasParam(PARAM_INPUT_2)) {
