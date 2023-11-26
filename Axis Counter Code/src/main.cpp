@@ -48,6 +48,13 @@ IPAddress myIP;
 IPAddress local_IP(10,10,10,1);
 IPAddress gateway(10,10,1,1);
 IPAddress subnet(255,255,255,0);
+AsyncWebServer server(80); //ESP8266WebServer
+/*
+void notFound(AsyncWebServerRequest *request) {
+  request->send(404, "text/plain", "Not found");
+}
+*/
+
 
 //Rotary Encoder
 #define ROTARY_PIN1	D6
@@ -72,12 +79,26 @@ volatile unsigned long requestedCycles = 0;
 byte percent = 0;
 int requestFlag = 0;
 byte pwm = 255;
-
 const char* PARAM_INPUT_1 = "pwm";
 const char* PARAM_INPUT_2 = "cycles";
 const char* PARAM_INPUT_3 = "input3";
-
 String inputMessageFinal = "testMessage";
+
+ESPDash dashboard(&server); //Attach ESP-DASH to AsyncWebServer
+unsigned long dash_millis = 0;
+unsigned long dash_millis_delta = 0;
+const int dash_interval = 500;//update interval millis
+Card start_stop(&dashboard, BUTTON_CARD, "Start/Stop");
+Card motor_speed(&dashboard, GENERIC_CARD, "Motor Speed", "rpm");
+Card motor_speed_target(&dashboard, SLIDER_CARD, "Target Speed", "%", 30, 100);
+Card machine_status(&dashboard, STATUS_CARD, "Machine Status", "Idle");
+
+
+Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "", 0, 1000);
+Card actuations_hour(&dashboard, GENERIC_CARD, "Actuations per hour");
+Card actuations_count(&dashboard, GENERIC_CARD, "Total Actuations");
+Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000000);
+
 
 // HTML web page to handle 3 input fields (input1, input2, input3)
 /*const char index_html[] PROGMEM = R"rawliteral(
@@ -99,6 +120,7 @@ String inputMessageFinal = "testMessage";
   </form>
 </body></html>)rawliteral";
 */
+/*
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html><head>
   <title>ESP Input Form</title>
@@ -111,9 +133,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     <input type="submit" value="Submit">
   </form>
 </body></html>)rawliteral";
-
-//ESP8266WebServer server(80);
-AsyncWebServer server(80);
+*/
 
 /* Just a little test message.  Go to http://192.168.4.1 in a web browser
    connected to this access point to see it.
@@ -122,9 +142,6 @@ AsyncWebServer server(80);
   server.send(200, "text/html", "< h1 >You are connected");
 }*/
 
-void notFound(AsyncWebServerRequest *request) {
-  request->send(404, "text/plain", "Not found");
-}
 
 IRAM_ATTR void doMotorEncoder() {
   unsigned char mresult = r.process();
@@ -136,47 +153,58 @@ IRAM_ATTR void doMotorEncoder() {
       MotorEncoderPos = 0;
     }
   }
-} 
+}
 
 void counterSetup() {
-  pinMode(ROTARY_PIN1, INPUT_PULLUP);
-  pinMode(ROTARY_PIN2, INPUT_PULLUP);
-  r.begin(ROTARY_PIN1, ROTARY_PIN2);
-  attachInterrupt(digitalPinToInterrupt(ROTARY_PIN1), doMotorEncoder, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(ROTARY_PIN2), doMotorEncoder, CHANGE);
-  Serial.println("\n\nSimple Counter");
+    pinMode(ROTARY_PIN1, INPUT_PULLUP);
+    pinMode(ROTARY_PIN2, INPUT_PULLUP);
+    r.begin(ROTARY_PIN1, ROTARY_PIN2);
+    attachInterrupt(digitalPinToInterrupt(ROTARY_PIN1), doMotorEncoder, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ROTARY_PIN2), doMotorEncoder, CHANGE);
+    Serial.println("\n\nSimple Counter");
 }
 
 void setup() {
-  pinMode(ROTARY_PIN1, INPUT_PULLUP);
-  pinMode(ROTARY_PIN2, INPUT_PULLUP);
+    pinMode(ROTARY_PIN1, INPUT_PULLUP);
+    pinMode(ROTARY_PIN2, INPUT_PULLUP);
 
-  Serial.begin(115200);
-  Serial.println("Begin test");
+    Serial.begin(115200);
+    Serial.println("Begin test");
 
-  pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, LOW); // LOW turns LED on
-  
-  pinMode(ENABLE_PIN, OUTPUT);
-  digitalWrite(ENABLE_PIN, LOW);
+    pinMode(ledPin, OUTPUT);
+    digitalWrite(ledPin, LOW); // LOW turns LED on
+    
+    pinMode(ENABLE_PIN, OUTPUT);
+    digitalWrite(ENABLE_PIN, LOW);
 
-  Serial.print("Configuring access point...");
-  int randSSID = random(1,9999);
-  snprintf(ssidRand,25,"%s-%04d",APSSID,1);
-  Serial.println(ssidRand);
-  //ssidRand = ssidRand + randSSID;
-  //ssid = ssidRand;
-  /* You can remove the password parameter if you want the AP to be open. */
-  WiFi.softAPConfig(local_IP, gateway, subnet);
-  WiFi.softAP(ssidRand, password);
+    Serial.print("Configuring access point...");
+    int randSSID = random(1,9999);
+    snprintf(ssidRand,25,"%s-%04d",APSSID,1);
+    Serial.println(ssidRand);
+    //ssidRand = ssidRand + randSSID;
+    //ssid = ssidRand;
+    /* You can remove the password parameter if you want the AP to be open. */
+    WiFi.softAPConfig(local_IP, gateway, subnet);
+    WiFi.softAP(ssidRand, password);
 
-  myIP = WiFi.softAPIP();
-  Serial.print("AP IP address: ");
-  Serial.println(myIP);
-  //server.on("/", handleRoot);
-  //server.begin();
-  Serial.println("HTTP server started");
+    myIP = WiFi.softAPIP();
+    Serial.println("HTTP server started");
+    Serial.print("AP IP address: ");
+    Serial.println(myIP);
+    //server.on("/", handleRoot);
+    server.begin();
+    
+    machine_status.update("Idle");
+    motor_speed_target.update(100); //default speed
 
+    motor_speed_target.attachCallback([&](int value){
+        //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
+        motor_speed_target.update(value);
+        dashboard.sendUpdates();
+    });
+
+
+/*
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, "text/html", index_html);
   });
@@ -232,76 +260,88 @@ void setup() {
   server.onNotFound(notFound);
   server.begin();
 
-  // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 64x48)
-  // init done
+*/
 
-  //display.display();
-  display.clearDisplay();
-  display.setTextSize(1.25);
-  display.setTextColor(WHITE);
-  display.setCursor(0,0);
-  display.println("DingKey");
-  display.println("Designs");
-  display.println("------");
-  display.println("v0.0.1");
-  display.println(myIP);
-  display.display();
-  delay(2000);
+    // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 64x48)
+    // init done
 
-  // Clear the buffer.
-  display.clearDisplay();
-  display.display();
-  counterSetup();
-  // text display tests
-  /*display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(0,0);
-  display.println(inputMessageFinal);
-  display.display();
-  delay(2000);
-  display.clearDisplay();*/
+    //display.display();
+    display.clearDisplay();
+    display.setTextSize(1.25);
+    display.setTextColor(WHITE);
+    display.setCursor(0,0);
+    display.println("DingKey");
+    display.println("Designs");
+    display.println("------");
+    display.println("v0.0.1");
+    display.println(myIP);
+    display.display();
+    delay(2000);
+
+    // Clear the buffer.
+    display.clearDisplay();
+    display.display();
+    counterSetup();
+    // text display tests
+    /*display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0,0);
+    display.println(inputMessageFinal);
+    display.display();
+    delay(2000);
+    display.clearDisplay();*/
 }
 
 void loop() {
-  //server.handleClient();
-  // text display tests
+    //server.handleClient();
+    // text display tests
 
-  // Original code:
-  // rpm = (((float)totalEncoderPos - (float)lastEncoderPos) / 234) *60.0 * (1000/(millis()-last_millis));
-  // lastEncoderPos = totalEncoderPos;
-  // last_millis = millis();
+    // Original code:
+    // rpm = (((float)totalEncoderPos - (float)lastEncoderPos) / 234) *60.0 * (1000/(millis()-last_millis));
+    // lastEncoderPos = totalEncoderPos;
+    // last_millis = millis();
+    
+    Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
+    micros_delta =  micros()-last_micros; // uint subtraction overflow protection
 
-  Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
-  micros_delta =  micros()-last_micros; // uint subtraction overflow protection
+    rpm = float(Encoder_delta) / float(STEPS_ROTATION) / (float(micros_delta)/1.00E6) * 60.0;
+    lastEncoderPos = totalEncoderPos;
+    last_micros = micros();
 
-  rpm = float(Encoder_delta) / float(STEPS_ROTATION) / (float(micros_delta)/1.00E6) * 60.0;
-  lastEncoderPos = totalEncoderPos;
-  last_micros = micros();
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0,0);
+    String displayCycles = "Cyc:";
+    //displayCycles = displayCycles + Cycles_done;
+    display.print(displayCycles);
+    display.println(Cycles_done);
+    display.print("rpm:");
+    display.println(rpm);
+    display.println(totalEncoderPos);
+    /*display.println("abcdef");
+    display.println("------");*/
+    display.println(myIP);
+    display.display();
+    //delay(100);
+    display.clearDisplay();
+    //analogWrite(D7, pwm);
+    //r.loop();
+    if (requestFlag == 1 && Cycles_done >= requestedCycles) {
+        analogWrite(D7, 0);
+        requestFlag = 0;
+        Cycles_done = 0;
+    }
 
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(0,0);
-  String displayCycles = "Cyc:";
-  //displayCycles = displayCycles + Cycles_done;
-  display.print(displayCycles);
-  display.println(Cycles_done);
-  display.print("rpm:");
-  display.println(rpm);
-  display.println(totalEncoderPos);
-  /*display.println("abcdef");
-  display.println("------");*/
-  display.println(myIP);
-  display.display();
-  //delay(100);
-  display.clearDisplay();
-  //analogWrite(D7, pwm);
-  //r.loop();
-  if (requestFlag == 1 && Cycles_done >= requestedCycles) {
-    analogWrite(D7, 0);
-    requestFlag = 0;
-    Cycles_done = 0;
-  }
-  delay(10);
-  yield();
-}
+    dash_millis_delta =  millis()-dash_millis;
+    if (dash_millis_delta>= dash_interval) {
+        dash_millis =  millis();
+        motor_speed.update((int)random(0, 50));
+        actuations_progress.update((int)random(0, 100));
+        dashboard.sendUpdates();
+    }
+
+    yield();
+
+    }
+
