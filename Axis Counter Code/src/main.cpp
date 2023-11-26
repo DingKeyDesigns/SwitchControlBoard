@@ -158,14 +158,7 @@ void setup() {
   digitalWrite(ledPin, LOW); // LOW turns LED on
   
   pinMode(ENABLE_PIN, OUTPUT);
-  digitalWrite(ENABLE_PIN, HIGH);
-  delay(2000);
   digitalWrite(ENABLE_PIN, LOW);
-  delay(2000);
-  digitalWrite(ENABLE_PIN, HIGH);
-  delay(2000);
-  digitalWrite(ENABLE_PIN, LOW);
-  delay(2000);
 
   Serial.print("Configuring access point...");
   int randSSID = random(1,9999);
