@@ -89,9 +89,10 @@ unsigned long dash_millis = 0;
 unsigned long dash_millis_delta = 0;
 const int dash_interval = 500;//update interval millis
 Card start_stop(&dashboard, BUTTON_CARD, "Start/Stop");
+Card machine_status(&dashboard, STATUS_CARD, "Machine Status", "Idle");
 Card motor_speed(&dashboard, GENERIC_CARD, "Motor Speed", "rpm");
 Card motor_speed_target(&dashboard, SLIDER_CARD, "Target Speed", "%", 30, 100);
-Card machine_status(&dashboard, STATUS_CARD, "Machine Status", "Idle");
+
 
 
 Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "", 0, 1000);
@@ -99,6 +100,10 @@ Card actuations_hour(&dashboard, GENERIC_CARD, "Actuations per hour");
 Card actuations_count(&dashboard, GENERIC_CARD, "Total Actuations");
 Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000000);
 
+int u_speed_target = 100; //percentage beteween 30-100
+unsigned long u_actuations_target = 0;
+float u_progress = 0; //percentage completion between 0-100%
+float u_actuations_hour = 0; //actuations per hour
 
 // HTML web page to handle 3 input fields (input1, input2, input3)
 /*const char index_html[] PROGMEM = R"rawliteral(
@@ -195,11 +200,19 @@ void setup() {
     server.begin();
     
     machine_status.update("Idle");
-    motor_speed_target.update(100); //default speed
-
+    
+    motor_speed_target.update(u_speed_target); //default speed
     motor_speed_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
+        u_speed_target = value;
         motor_speed_target.update(value);
+        dashboard.sendUpdates();
+    });
+
+    actuations_target.attachCallback([&](int value){
+        //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
+        u_actuations_target = value;
+        actuations_target.update(value);
         dashboard.sendUpdates();
     });
 
