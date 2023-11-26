@@ -1,31 +1,44 @@
 #include <Arduino.h>
-#include <ESP8266WiFi.h>
-#include <WiFiClient.h>
 #include <SPI.h>
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include <ESPAsyncWebServer.h>
-#include <ESPAsyncTCP.h>
 #include <Rotary.h>
 
-// SCL GPIO5
-// SDA GPIO4
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESPAsyncWebServer.h>
+#include <ESPAsyncTCP.h>
+#include <ESPDash.h>
+
 #define OLED_RESET 0  // GPIO0
 Adafruit_SSD1306 display(OLED_RESET);
+#define LOGO16_GLCD_HEIGHT 16
+#define LOGO16_GLCD_WIDTH  16
 
+/* Unused variables
+// SCL GPIO5
+// SDA GPIO4
 #define NUMFLAKES 10
 #define XPOS 0
 #define YPOS 1
 #define DELTAY 2
+unsigned long Old_Cycles_done = 0;
+unsigned long last_millis = 0;
+*/
 
-#define LOGO16_GLCD_HEIGHT 16
-#define LOGO16_GLCD_WIDTH  16
 
 #ifndef APSSID
-#define APSSID "DingKeyWifi"
-#define APPSK  "deeznuts"
+    #define APSSID "DingKeyWifi"
+    #define APPSK  "deeznuts"
 #endif
+const char *password = APPSK; //const char *ssid = APSSID;
+char ssidRand[25]; //String ssidRand = APSSID;
+IPAddress myIP;
+IPAddress local_IP(10,10,10,1);
+IPAddress gateway(10,10,1,1);
+IPAddress subnet(255,255,255,0);
 
 #define ROTARY_PIN1	D6
 #define ROTARY_PIN2	D5
@@ -35,25 +48,18 @@ Adafruit_SSD1306 display(OLED_RESET);
 #define ENABLE_PIN D8
 #define ledPin LED_BUILTIN  // the number of the LED pin
 
-//ESPRotary r;
 Rotary r = Rotary(ROTARY_PIN1, ROTARY_PIN2);
-// Clockwise step.
 #define DIR_CW 0x10
-// Counter-clockwise step.
 #define DIR_CCW 0x20
-
-unsigned long last_micros = 0;
-unsigned long lastEncoderPos = 0;
-float rpm = 0;
-
 volatile unsigned long MotorEncoderPos = 0;
 volatile unsigned long totalEncoderPos = 0;
-volatile float Cycles_done = 0;
-
+unsigned long lastEncoderPos = 0;
+unsigned long last_micros = 0;
 unsigned long Encoder_delta =  0;
 unsigned long micros_delta =  0;
+float rpm = 0;
+volatile double Cycles_done = 0;
 
-unsigned long Old_Cycles_done = 0;
 volatile unsigned long requestedCycles = 0;
 byte percent = 0;
 int requestFlag = 0;
@@ -61,17 +67,7 @@ int requestFlag = 0;
 //Ticker t;
 byte pwm = 255;
 
-unsigned long last_millis = 0;
 
-/* Set these to your desired credentials. */
-//const char *ssid = APSSID;
-const char *password = APPSK;
-//String ssidRand = APSSID;
-char ssidRand[25];
-IPAddress myIP;
-IPAddress local_IP(10,10,10,1);
-IPAddress gateway(10,10,1,1);
-IPAddress subnet(255,255,255,0);
 
 const char* PARAM_INPUT_1 = "pwm";
 const char* PARAM_INPUT_2 = "cycles";
@@ -150,9 +146,9 @@ void counterSetup() {
 void setup() {
   pinMode(ROTARY_PIN1, INPUT_PULLUP);
   pinMode(ROTARY_PIN2, INPUT_PULLUP);
-  delay(1000);
+
   Serial.begin(115200);
-  Serial.println();
+  Serial.println("Begin test");
 
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, LOW); // LOW turns LED on
@@ -238,11 +234,13 @@ void setup() {
 
   //display.display();
   display.clearDisplay();
-  display.setTextSize(1);
+  display.setTextSize(1.25);
   display.setTextColor(WHITE);
   display.setCursor(0,0);
-  display.println("abcdef");
+  display.println("DingKey");
+  display.println("Designs");
   display.println("------");
+  display.println("v0.0.1");
   display.println(myIP);
   display.display();
   delay(2000);
