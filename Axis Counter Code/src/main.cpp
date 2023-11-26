@@ -1,3 +1,7 @@
+// DingKey Designs Control Board
+// V0.0.1
+// 11/26/2023
+
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
@@ -12,11 +16,6 @@
 #include <ESPAsyncTCP.h>
 #include <ESPDash.h>
 
-#define OLED_RESET 0  // GPIO0
-Adafruit_SSD1306 display(OLED_RESET);
-#define LOGO16_GLCD_HEIGHT 16
-#define LOGO16_GLCD_WIDTH  16
-
 /* Unused variables
 // SCL GPIO5
 // SDA GPIO4
@@ -28,7 +27,17 @@ unsigned long Old_Cycles_done = 0;
 unsigned long last_millis = 0;
 */
 
+//Screen Setup
+#define OLED_RESET 0  // GPIO0
+Adafruit_SSD1306 display(OLED_RESET);
+#define LOGO16_GLCD_HEIGHT 16
+#define LOGO16_GLCD_WIDTH  16
 
+//Power LED
+#define ENABLE_PIN D8
+#define ledPin LED_BUILTIN  // the number of the LED pin
+
+//Wifi Setup
 #ifndef APSSID
     #define APSSID "DingKeyWifi"
     #define APPSK  "deeznuts"
@@ -40,14 +49,12 @@ IPAddress local_IP(10,10,10,1);
 IPAddress gateway(10,10,1,1);
 IPAddress subnet(255,255,255,0);
 
+//Rotary Encoder
 #define ROTARY_PIN1	D6
 #define ROTARY_PIN2	D5
 #define CLICKS_PER_STEP 1
-#define STEPS_ROTATION 234.0
-
-#define ENABLE_PIN D8
-#define ledPin LED_BUILTIN  // the number of the LED pin
-
+#define STEPS_ROTATION 187.00 //170rpm  11 pulses per rotation, Gear ratio 176rpm 1:34, Gear Ratio 281rpm 1:21.3, divide by 2 two actuations per rotation
+#define STEPS_ROTATION 117.15 //281rpm 11 pulses per rotation, Gear ratio 176rpm 1:34, Gear Ratio 281rpm 1:21.3, divide by 2 two actuations per rotation
 Rotary r = Rotary(ROTARY_PIN1, ROTARY_PIN2);
 #define DIR_CW 0x10
 #define DIR_CCW 0x20
@@ -60,14 +67,11 @@ unsigned long micros_delta =  0;
 float rpm = 0;
 volatile double Cycles_done = 0;
 
+//User Control
 volatile unsigned long requestedCycles = 0;
 byte percent = 0;
 int requestFlag = 0;
-
-//Ticker t;
 byte pwm = 255;
-
-
 
 const char* PARAM_INPUT_1 = "pwm";
 const char* PARAM_INPUT_2 = "cycles";
