@@ -72,7 +72,7 @@ unsigned long last_micros = 0;
 unsigned long Encoder_delta =  0;
 unsigned long micros_delta =  0;
 float rpm = 0;
-float cps = 0;
+float cps = 0; // cycles per second
 volatile double Cycles_done = 0;
 
 //User Control
@@ -96,15 +96,19 @@ Card motor_speed(&dashboard, GENERIC_CARD, "Motor Speed", "rpm");
 Card motor_speed_target(&dashboard, SLIDER_CARD, "Motor Speed", "%", 30, 100);
 
 Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "", 0, 1000);
-Card actuations_hour(&dashboard, GENERIC_CARD, "Actuations per hour");
+//Card actuations_hour(&dashboard, GENERIC_CARD, "Actuations per hour");
 Card actuations_count(&dashboard, GENERIC_CARD, "Total Actuations");
 Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000000);
 
-int u_speed_target = 100; //percentage beteween 30-100
-unsigned long u_actuations_target = 0;
-float u_progress = 0; //percentage completion between 0-100%
-float u_actuations_hour = 0; //actuations per hour
+Card reset(&dashboard, BUTTON_CARD, "Reset");
+
 bool u_request = 0;
+int u_speed_target = 100; //percentage beteween 30-100
+float u_progress = 0; //percentage completion between 0-100%
+unsigned long u_actuations_target = 0; //requested number of cycles
+
+//float u_actuations_hour = 0; //actuations per hour
+
 
 // HTML web page to handle 3 input fields (input1, input2, input3)
 /*const char index_html[] PROGMEM = R"rawliteral(
@@ -221,6 +225,7 @@ void setup() {
 
     actuations_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
+        value = value/1000*1000; // round to nearest 1000
         u_actuations_target = value;
         actuations_target.update(value);
         dashboard.sendUpdates();
@@ -353,7 +358,16 @@ void loop() {
     display.clearDisplay();
     //analogWrite(D7, pwm);
     //r.loop();
+    
+    // Motor Control
+    /*
     if (requestFlag == 1 && Cycles_done >= requestedCycles) {
+        analogWrite(D7, 0);
+        requestFlag = 0;
+        Cycles_done = 0;
+    }
+    */
+   if (requestFlag == 1 && Cycles_done >= requestedCycles) {
         analogWrite(D7, 0);
         requestFlag = 0;
         Cycles_done = 0;
