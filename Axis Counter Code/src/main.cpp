@@ -59,7 +59,7 @@ byte percent = 0;
 int requestFlag = 0;
 
 //Ticker t;
-byte pwm = 20;
+byte pwm = 40;
 
 unsigned long last_millis = 0;
 
@@ -158,6 +158,10 @@ void setup() {
   digitalWrite(ledPin, LOW); // LOW turns LED on
   
   Wire.begin();
+  Wire.beginTransmission(0x2E);
+  Wire.write(byte(0x00));
+  Wire.write(pwm);
+  Wire.endTransmission();
   
   /*pinMode(ENABLE_PIN, OUTPUT);
   digitalWrite(ENABLE_PIN, HIGH);
