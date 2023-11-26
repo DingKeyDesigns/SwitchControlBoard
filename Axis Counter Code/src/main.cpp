@@ -60,7 +60,7 @@ void notFound(AsyncWebServerRequest *request) {
 #define ROTARY_PIN1	D6
 #define ROTARY_PIN2	D5
 #define CLICKS_PER_STEP 1
-#define STEPS_ROTATION 187.00 //170rpm  11 pulses per rotation, Gear ratio 176rpm 1:34, Gear Ratio 281rpm 1:21.3, divide by 2 two actuations per rotation
+//#define STEPS_ROTATION 187.00 //170rpm  11 pulses per rotation, Gear ratio 176rpm 1:34, Gear Ratio 281rpm 1:21.3, divide by 2 two actuations per rotation
 #define STEPS_ROTATION 117.15 //281rpm 11 pulses per rotation, Gear ratio 176rpm 1:34, Gear Ratio 281rpm 1:21.3, divide by 2 two actuations per rotation
 Rotary r = Rotary(ROTARY_PIN1, ROTARY_PIN2);
 #define DIR_CW 0x10
@@ -72,6 +72,7 @@ unsigned long last_micros = 0;
 unsigned long Encoder_delta =  0;
 unsigned long micros_delta =  0;
 float rpm = 0;
+float cps = 0;
 volatile double Cycles_done = 0;
 
 //User Control
@@ -88,12 +89,11 @@ ESPDash dashboard(&server); //Attach ESP-DASH to AsyncWebServer
 unsigned long dash_millis = 0;
 unsigned long dash_millis_delta = 0;
 const int dash_interval = 500;//update interval millis
+
 Card start_stop(&dashboard, BUTTON_CARD, "Start/Stop");
 Card machine_status(&dashboard, STATUS_CARD, "Machine Status", "Idle");
 Card motor_speed(&dashboard, GENERIC_CARD, "Motor Speed", "rpm");
-Card motor_speed_target(&dashboard, SLIDER_CARD, "Target Speed", "%", 30, 100);
-
-
+Card motor_speed_target(&dashboard, SLIDER_CARD, "Motor Speed", "%", 30, 100);
 
 Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "", 0, 1000);
 Card actuations_hour(&dashboard, GENERIC_CARD, "Actuations per hour");
@@ -104,6 +104,7 @@ int u_speed_target = 100; //percentage beteween 30-100
 unsigned long u_actuations_target = 0;
 float u_progress = 0; //percentage completion between 0-100%
 float u_actuations_hour = 0; //actuations per hour
+bool u_request = 0;
 
 // HTML web page to handle 3 input fields (input1, input2, input3)
 /*const char index_html[] PROGMEM = R"rawliteral(
@@ -200,8 +201,17 @@ void setup() {
     server.begin();
     
     machine_status.update("Idle");
-    
     motor_speed_target.update(u_speed_target); //default speed
+    
+    start_stop.attachCallback([&](bool value){
+        /* Print our new button value received from dashboard */
+        //Serial.println("Button Triggered: "+String((value)?"true":"false"));
+        /* Make sure we update our button's value and send update to dashboard */
+        u_request = value;
+        start_stop.update(value);
+        dashboard.sendUpdates();
+    });
+    
     motor_speed_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
         u_speed_target = value;
@@ -319,6 +329,9 @@ void loop() {
     micros_delta =  micros()-last_micros; // uint subtraction overflow protection
 
     rpm = float(Encoder_delta) / float(STEPS_ROTATION) / (float(micros_delta)/1.00E6) * 60.0;
+    rpm = rpm/2.0; //2 cyles per rotation
+    cps = float(Encoder_delta) / float(STEPS_ROTATION) / (float(micros_delta)/1.00E6); //cycles per second
+    
     lastEncoderPos = totalEncoderPos;
     last_micros = micros();
 
