@@ -223,9 +223,10 @@ void setup() {
             if(WiFi.SSID(i) == ssidRand){ //enter the ssid which you want to search
                 Serial.println("Existing network found");
                 id_suffix++; // increment to next wifi
+                snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix); //update with newest increment
             }
         }
-        snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix); //update with newest increment
+        
     }
     
     WiFi.softAPConfig(local_IP, gateway, subnet);
