@@ -214,14 +214,14 @@ void setup() {
         Serial.println("no networks found");
     else
     {
-        display.print(n);
-        display.println(" networks found");
+        Serial.print(n);
+        Serial.println(" networks found");
         for (int i = 0; i < n; ++i)
         {
         // Print SSID and RSSI for each network found
-        display.println(WiFi.SSID(i));
+        Serial.println(WiFi.SSID(i));
             if(WiFi.SSID(i) == ssidRand){ //enter the ssid which you want to search
-                display.println("Existing network found");
+                Serial.println("Existing network found");
                 id_suffix++; // increment to next wifi
             }
         }
