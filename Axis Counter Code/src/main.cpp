@@ -191,17 +191,43 @@ void setup() {
 
     pinMode(ledPin, OUTPUT);
     digitalWrite(ledPin, LOW); // LOW turns LED on
-    
+
     pinMode(ENABLE_PIN, OUTPUT);
     digitalWrite(ENABLE_PIN, LOW);
 
+
+    //Wifi Access Point
+    int id_suffix = 1;
     Serial.print("Configuring access point...");
-    int randSSID = random(1,9999);
-    snprintf(ssidRand,25,"%s-%04d",APSSID,1);
-    Serial.println(ssidRand);
+    // int randSSID = random(1,9999);
+    snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix);
+    //Serial.println(ssidRand);
     //ssidRand = ssidRand + randSSID;
     //ssid = ssidRand;
     /* You can remove the password parameter if you want the AP to be open. */
+    
+    
+    // Example from https://arduino.stackexchange.com/questions/43044/esp8266-check-if-a-ssid-is-in-range
+    int n = WiFi.scanNetworks();
+    Serial.println("scan done");
+    if (n == 0)
+        Serial.println("no networks found");
+    else
+    {
+        display.print(n);
+        display.println(" networks found");
+        for (int i = 0; i < n; ++i)
+        {
+        // Print SSID and RSSI for each network found
+        display.println(WiFi.SSID(i));
+            if(WiFi.SSID(i) == ssidRand){ //enter the ssid which you want to search
+                display.println("Existing network found");
+                id_suffix++; // increment to next wifi
+            }
+        }
+        snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix); //update with newest increment
+    }
+    
     WiFi.softAPConfig(local_IP, gateway, subnet);
     WiFi.softAP(ssidRand, password);
 
