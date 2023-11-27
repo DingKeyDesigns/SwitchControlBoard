@@ -239,6 +239,23 @@ void setup() {
         dashboard.sendUpdates();
     });
 
+    reset.attachCallback([&](bool value){
+        /* Print our new button value received from dashboard */
+        //Serial.println("Button Triggered: "+String((value)?"true":"false"));
+        /* Make sure we update our button's value and send update to dashboard */
+        u_request = 0;
+        u_speed_target = 100;
+        u_progress = 0;
+        u_actuations_target= 0;
+        state=0;
+        start_stop.update(0);
+        motor_speed_target.update(100);
+        actuations_progress.update(0);
+        actuations_count.update(0);
+        actuations_target.update(0);
+        dashboard.sendUpdates();
+    });
+
 
 /*
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
