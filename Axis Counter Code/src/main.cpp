@@ -14,7 +14,7 @@
 #include <WiFiClient.h>
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncTCP.h>
-#include <ESPDash.h>
+#include <ESPDashPro.h>
 
 /* Unused variables
 // SCL GPIO5
@@ -69,8 +69,8 @@ volatile unsigned long MotorEncoderPos = 0;
 volatile unsigned long totalEncoderPos = 0;
 unsigned long lastEncoderPos = 0;
 unsigned long last_micros = 0;
-unsigned long Encoder_delta =  0;
-unsigned long micros_delta =  0;
+unsigned long Encoder_delta = 0;
+unsigned long micros_delta = 0;
 float rpm = 0;
 float cps = 0; // cycles per second
 volatile double Cycles_done = 0;
@@ -242,14 +242,16 @@ void setup() {
     machine_status.update("Idle");
     motor_speed_target.update(u_speed_target); //default speed
     
-    start_stop.attachCallback([&](bool value){
+    dashboard.setTitle("DingKey Designs");
+    
+    //start_stop.attachCallback([&](bool value){
         /* Print our new button value received from dashboard */
         //Serial.println("Button Triggered: "+String((value)?"true":"false"));
         /* Make sure we update our button's value and send update to dashboard */
-        u_request = value;
-        start_stop.update(value);
-        dashboard.sendUpdates();
-    });
+    //    u_request = value;
+    //    start_stop.update(value);
+    //    dashboard.sendUpdates();
+    //});
     
     motor_speed_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
@@ -266,22 +268,22 @@ void setup() {
         dashboard.sendUpdates();
     });
 
-    reset.attachCallback([&](bool value){
+    //reset.attachCallback([&](bool value){
         /* Print our new button value received from dashboard */
         //Serial.println("Button Triggered: "+String((value)?"true":"false"));
         /* Make sure we update our button's value and send update to dashboard */
-        u_request = 0;
-        u_speed_target = 100;
-        u_progress = 0;
-        u_actuations_target= 0;
-        state=0;
-        start_stop.update(0);
-        motor_speed_target.update(100);
-        actuations_progress.update(0);
-        actuations_count.update(0);
-        actuations_target.update(0);
-        dashboard.sendUpdates();
-    });
+    //    u_request = 0;
+    //    u_speed_target = 100;
+    //    u_progress = 0;
+    //    u_actuations_target= 0;
+    //    state=0;
+    //    start_stop.update(0);
+    //    motor_speed_target.update(100);
+    //    actuations_progress.update(0);
+    //    actuations_count.update(0);
+    //    actuations_target.update(0);
+    //    dashboard.sendUpdates();
+    //});
 
 
 /*
@@ -448,6 +450,12 @@ void loop() {
         }
         break;
     case 2:
+        run_enable=1;
+        if (!u_request || Cycles_done>=u_actuations_target){
+            state=0;
+        }
+        break;
+    case 3:
         run_enable=1;
         if (!u_request || Cycles_done>=u_actuations_target){
             state=0;
