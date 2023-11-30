@@ -16,6 +16,9 @@
 #include <ESPAsyncTCP.h>
 #include <ESPDashPro.h>
 
+#include <TimeLib.h>
+#include <time.h>
+
 /* Unused variables
 // SCL GPIO5
 // SDA GPIO4
@@ -100,14 +103,12 @@ unsigned long dash_millis_delta = 0;
 const int dash_interval = 200;//update interval millis
 
 Card start_stop(&dashboard, BUTTON_CARD, "Start/Stop");
-Card machine_status(&dashboard, STATUS_CARD, "Machine Status", "Idle");
 Card motor_speed(&dashboard, GENERIC_CARD, "Motor Speed", "rpm");
 Card motor_speed_target(&dashboard, SLIDER_CARD, "Motor Speed", "%", 30, 100);
 
 Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "", 0, 1000);
-//Card actuations_hour(&dashboard, GENERIC_CARD, "Actuations per hour");
-Card actuations_count(&dashboard, GENERIC_CARD, "Total Actuations");
 Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000000);
+Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes)");
 
 Card reset(&dashboard, BUTTON_CARD, "Reset");
 
@@ -115,7 +116,7 @@ Tab totals_tab(&dashboard, "Totals");
 Card Run_total(&dashboard, GENERIC_CARD, "Total Run Time");
 Card Cycles_total(&dashboard, GENERIC_CARD, "Total Actuation Cycles");
 
-bool u_request = 0;
+int u_request = 0;
 int u_speed_target = 100; //percentage beteween 30-100
 const int u_speed_target_lim1 = 30;
 const int u_speed_target_lim2 = 100;
@@ -124,7 +125,6 @@ unsigned long u_actuations_target = 0; //requested number of cycles
 unsigned long u_timer_target = 0; //requested number of cycles
 
 //float u_actuations_hour = 0; //actuations per hour
-
 
 // HTML web page to handle 3 input fields (input1, input2, input3)
 /*const char index_html[] PROGMEM = R"rawliteral(
@@ -247,19 +247,19 @@ void setup() {
     //server.on("/", handleRoot);
     server.begin();
     
-    machine_status.update("Idle");
+    start_stop.update(true); // initial state is machine running
     motor_speed_target.update(u_speed_target); //default speed
     
     dashboard.setTitle("DingKey Designs");
     
-    //start_stop.attachCallback([&](bool value){
+    start_stop.attachCallback([&](int value){
         /* Print our new button value received from dashboard */
         //Serial.println("Button Triggered: "+String((value)?"true":"false"));
         /* Make sure we update our button's value and send update to dashboard */
-    //    u_request = value;
-    //    start_stop.update(value);
-    //    dashboard.sendUpdates();
-    //});
+        u_request = value;
+        start_stop.update(value);
+        dashboard.sendUpdates();
+    });
     
     motor_speed_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
@@ -276,8 +276,16 @@ void setup() {
         dashboard.sendUpdates();
     });
 
+    timer_target.attachCallback([&](const char* value){
+        //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
+        //String u_timer_target_str = string(value);
+        timer_target.update(value);
+        dashboard.sendUpdates();
+    });
+
     Run_total.setTab(&totals_tab);
     Cycles_total.setTab(&totals_tab);
+
 
     //reset.attachCallback([&](bool value){
         /* Print our new button value received from dashboard */
@@ -415,6 +423,12 @@ void loop() {
     display.print("rpm:");
     display.println(rpm);
     display.println(totalEncoderPos);
+    display.print(hour());
+    display.print("h ");
+    display.print(minute());
+    display.print("m ");
+    display.print(second());
+    display.println("s");
     /*display.println("abcdef");
     display.println("------");*/
     display.println(myIP);
