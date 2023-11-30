@@ -25,6 +25,12 @@
 #define DELTAY 2
 unsigned long Old_Cycles_done = 0;
 unsigned long last_millis = 0;
+byte percent = 0;
+byte pwm = 255;
+const char* PARAM_INPUT_1 = "pwm";
+const char* PARAM_INPUT_2 = "cycles";
+const char* PARAM_INPUT_3 = "input3";
+String inputMessageFinal = "testMessage";
 */
 
 //Screen Setup
@@ -55,7 +61,6 @@ void notFound(AsyncWebServerRequest *request) {
 }
 */
 
-
 //Rotary Encoder
 #define ROTARY_PIN1	D6
 #define ROTARY_PIN2	D5
@@ -74,6 +79,10 @@ unsigned long micros_delta = 0;
 float rpm = 0;
 float cps = 0; // cycles per second
 volatile double Cycles_done = 0;
+volatile double Cycles_done_total = 0; // not resettable unless powered down
+unsigned long Run_time = 0;
+unsigned long Run_time_total = 0;  // not resettable unless powered down
+unsigned long timer_start = 0;
 
 //Motor Control
 #define MOTOR_PWM D7
@@ -83,13 +92,7 @@ int pwm_command = 0;
 volatile unsigned long requestedCycles = 0;
 int state=0;
 bool run_enable = 0;
-byte percent = 0;
 int requestFlag = 0;
-byte pwm = 255;
-const char* PARAM_INPUT_1 = "pwm";
-const char* PARAM_INPUT_2 = "cycles";
-const char* PARAM_INPUT_3 = "input3";
-String inputMessageFinal = "testMessage";
 
 ESPDash dashboard(&server); //Attach ESP-DASH to AsyncWebServer
 unsigned long dash_millis = 0;
@@ -114,6 +117,7 @@ const int u_speed_target_lim1 = 30;
 const int u_speed_target_lim2 = 100;
 float u_progress = 0; //percentage completion between 0-100%
 unsigned long u_actuations_target = 0; //requested number of cycles
+unsigned long u_timer_target = 0; //requested number of cycles
 
 //float u_actuations_hour = 0; //actuations per hour
 
@@ -440,25 +444,43 @@ void loop() {
             state=1;
         }
         break;
+    
     case 1:
         run_enable=1;
         if (u_actuations_target>0){
             state=2;
         }
+        else if (u_actuations_target>0){
+            state=3;
+            timer_start=millis();
+        }
         if (!u_request){
             state=0;
         }
         break;
+    
     case 2:
         run_enable=1;
         if (!u_request || Cycles_done>=u_actuations_target){
             state=0;
+            Cycles_done=0;
+        }
+        else if (u_timer_target>0){
+            timer_start=millis();
+            u_actuations_target=0;
         }
         break;
+    
     case 3:
         run_enable=1;
-        if (!u_request || Cycles_done>=u_actuations_target){
+        if (!u_request || Run_time>=u_timer_target){
             state=0;
+            u_timer_target=0;
+        }
+        else if (u_actuations_target>0)
+        {
+            Run_timer = 0;
+            u_timer_target = 0;
         }
         break;
     }
