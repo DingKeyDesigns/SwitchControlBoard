@@ -85,6 +85,7 @@ volatile double Cycles_done = 0;
 volatile double Cycles_done_total = 0; // not resettable unless powered down
 unsigned long Run_time = 0;
 unsigned long Run_time_total = 0;  // not resettable unless powered down
+char Run_time_total_txt[15];
 unsigned long timer_start = 0;
 
 //Motor Control
@@ -188,6 +189,21 @@ void counterSetup() {
     attachInterrupt(digitalPinToInterrupt(ROTARY_PIN1), doMotorEncoder, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ROTARY_PIN2), doMotorEncoder, CHANGE);
     Serial.println("\n\nSimple Counter");
+}
+
+void time_string(){
+    if (day()-1>0){
+        snprintf(Run_time_total_txt,15, "%ud %uh %um %us", day()-1, hour(), minute(), second());
+    }
+    else if (hour()>0)
+    {
+        snprintf(Run_time_total_txt,15, "%uh %um %us", hour(), minute(), second());
+    }
+    else{
+        snprintf(Run_time_total_txt,15, "%um %us", minute(), second());
+    }
+    
+
 }
 
 void setup() {
@@ -422,13 +438,17 @@ void loop() {
     display.println(Cycles_done);
     display.print("rpm:");
     display.println(rpm);
-    display.println(totalEncoderPos);
+    //display.println(totalEncoderPos);
+    /*
     display.print(hour());
     display.print("h ");
     display.print(minute());
     display.print("m ");
     display.print(second());
     display.println("s");
+    */
+    time_string(); //update display time string
+    display.println(Run_time_total_txt);
     /*display.println("abcdef");
     display.println("------");*/
     display.println(myIP);
@@ -507,15 +527,17 @@ void loop() {
     }
 
     Serial.println(pwm_command*run_enable);
-    analogWrite(MOTOR_PWM,pwm_command*run_enable);
+    analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
 
     dash_millis_delta =  millis()-dash_millis;
     if (dash_millis_delta>= dash_interval) {
         dash_millis =  millis();
         motor_speed.update((int)random(0, 50));
         actuations_progress.update((int)random(0, 100));
-        Run_total.update((int)random(0, 10000));
+        
+        Run_total.update(Run_time_total_txt);
         Cycles_total.update((int)random(0, 10000));
+        
         dashboard.sendUpdates();
     }
 
