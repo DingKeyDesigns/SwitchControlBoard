@@ -101,7 +101,7 @@ int requestFlag = 0;
 ESPDash dashboard(&server); //Attach ESP-DASH to AsyncWebServer
 unsigned long dash_millis = 0;
 unsigned long dash_millis_delta = 0;
-const int dash_interval = 200;//update interval millis
+const int dash_interval = 350;//update interval millis
 
 Card start_stop(&dashboard, BUTTON_CARD, "Start/Stop");
 Card motor_speed(&dashboard, GENERIC_CARD, "Motor Speed", "rpm");
@@ -110,8 +110,6 @@ Card motor_speed_target(&dashboard, SLIDER_CARD, "Motor Speed", "%", 30, 100);
 Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "", 0, 1000);
 Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000000);
 Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes)");
-
-Card reset(&dashboard, BUTTON_CARD, "Reset");
 
 Tab totals_tab(&dashboard, "Totals");
 Card Run_total(&dashboard, GENERIC_CARD, "Total Run Time");
@@ -301,25 +299,6 @@ void setup() {
 
     Run_total.setTab(&totals_tab);
     Cycles_total.setTab(&totals_tab);
-
-
-    //reset.attachCallback([&](bool value){
-        /* Print our new button value received from dashboard */
-        //Serial.println("Button Triggered: "+String((value)?"true":"false"));
-        /* Make sure we update our button's value and send update to dashboard */
-    //    u_request = 0;
-    //    u_speed_target = 100;
-    //    u_progress = 0;
-    //    u_actuations_target= 0;
-    //    state=0;
-    //    start_stop.update(0);
-    //    motor_speed_target.update(100);
-    //    actuations_progress.update(0);
-    //    actuations_count.update(0);
-    //    actuations_target.update(0);
-    //    dashboard.sendUpdates();
-    //});
-
 
 /*
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
