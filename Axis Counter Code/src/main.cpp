@@ -75,8 +75,14 @@ float rpm = 0;
 float cps = 0; // cycles per second
 volatile double Cycles_done = 0;
 
+//Motor Control
+#define MOTOR_PWM D7
+int pwm_command = 0;
+
 //User Control
 volatile unsigned long requestedCycles = 0;
+int state=0;
+bool run_enable = 0;
 byte percent = 0;
 int requestFlag = 0;
 byte pwm = 255;
@@ -88,7 +94,7 @@ String inputMessageFinal = "testMessage";
 ESPDash dashboard(&server); //Attach ESP-DASH to AsyncWebServer
 unsigned long dash_millis = 0;
 unsigned long dash_millis_delta = 0;
-const int dash_interval = 500;//update interval millis
+const int dash_interval = 200;//update interval millis
 
 Card start_stop(&dashboard, BUTTON_CARD, "Start/Stop");
 Card machine_status(&dashboard, STATUS_CARD, "Machine Status", "Idle");
@@ -104,6 +110,8 @@ Card reset(&dashboard, BUTTON_CARD, "Reset");
 
 bool u_request = 0;
 int u_speed_target = 100; //percentage beteween 30-100
+const int u_speed_target_lim1 = 30;
+const int u_speed_target_lim2 = 100;
 float u_progress = 0; //percentage completion between 0-100%
 unsigned long u_actuations_target = 0; //requested number of cycles
 
@@ -183,17 +191,44 @@ void setup() {
 
     pinMode(ledPin, OUTPUT);
     digitalWrite(ledPin, LOW); // LOW turns LED on
-    
+
     pinMode(ENABLE_PIN, OUTPUT);
     digitalWrite(ENABLE_PIN, LOW);
 
+
+    //Wifi Access Point
+    int id_suffix = 1;
     Serial.print("Configuring access point...");
-    int randSSID = random(1,9999);
-    snprintf(ssidRand,25,"%s-%04d",APSSID,1);
-    Serial.println(ssidRand);
+    // int randSSID = random(1,9999);
+    snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix);
+    //Serial.println(ssidRand);
     //ssidRand = ssidRand + randSSID;
     //ssid = ssidRand;
     /* You can remove the password parameter if you want the AP to be open. */
+    
+    
+    // Example from https://arduino.stackexchange.com/questions/43044/esp8266-check-if-a-ssid-is-in-range
+    int n = WiFi.scanNetworks();
+    Serial.println("scan done");
+    if (n == 0)
+        Serial.println("no networks found");
+    else
+    {
+        Serial.print(n);
+        Serial.println(" networks found");
+        for (int i = 0; i < n; ++i)
+        {
+        // Print SSID and RSSI for each network found
+        Serial.println(WiFi.SSID(i));
+            if(WiFi.SSID(i) == ssidRand){ //enter the ssid which you want to search
+                Serial.println("Existing network found");
+                id_suffix++; // increment to next wifi
+                snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix); //update with newest increment
+            }
+        }
+        
+    }
+    
     WiFi.softAPConfig(local_IP, gateway, subnet);
     WiFi.softAP(ssidRand, password);
 
@@ -228,6 +263,23 @@ void setup() {
         value = value/1000*1000; // round to nearest 1000
         u_actuations_target = value;
         actuations_target.update(value);
+        dashboard.sendUpdates();
+    });
+
+    reset.attachCallback([&](bool value){
+        /* Print our new button value received from dashboard */
+        //Serial.println("Button Triggered: "+String((value)?"true":"false"));
+        /* Make sure we update our button's value and send update to dashboard */
+        u_request = 0;
+        u_speed_target = 100;
+        u_progress = 0;
+        u_actuations_target= 0;
+        state=0;
+        start_stop.update(0);
+        motor_speed_target.update(100);
+        actuations_progress.update(0);
+        actuations_count.update(0);
+        actuations_target.update(0);
         dashboard.sendUpdates();
     });
 
@@ -367,11 +419,44 @@ void loop() {
         Cycles_done = 0;
     }
     */
-   if (requestFlag == 1 && Cycles_done >= requestedCycles) {
-        analogWrite(D7, 0);
-        requestFlag = 0;
-        Cycles_done = 0;
+    // Speed Control
+    // Speed targets between 30% and 100%
+    if (u_speed_target < u_speed_target_lim1){
+        u_speed_target = u_speed_target_lim1;
     }
+    if (u_speed_target > u_speed_target_lim2){
+        u_speed_target = u_speed_target_lim2;
+    }
+    pwm_command = map(u_speed_target,0,100,0,255);
+
+    //State Machine Logic
+    switch (state)
+    {
+    case 0:
+        run_enable=0;
+        if (u_request){
+            state=1;
+        }
+        break;
+    case 1:
+        run_enable=1;
+        if (u_actuations_target>0){
+            state=2;
+        }
+        if (!u_request){
+            state=0;
+        }
+        break;
+    case 2:
+        run_enable=1;
+        if (!u_request || Cycles_done>=u_actuations_target){
+            state=0;
+        }
+        break;
+    }
+
+    Serial.println(pwm_command*run_enable);
+    analogWrite(MOTOR_PWM,pwm_command*run_enable);
 
     dash_millis_delta =  millis()-dash_millis;
     if (dash_millis_delta>= dash_interval) {
