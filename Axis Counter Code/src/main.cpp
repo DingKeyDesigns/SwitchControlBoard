@@ -111,6 +111,10 @@ Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000
 
 Card reset(&dashboard, BUTTON_CARD, "Reset");
 
+Tab totals_tab(&dashboard, "Totals");
+Card Run_total(&dashboard, GENERIC_CARD, "Total Run Time");
+Card Cycles_total(&dashboard, GENERIC_CARD, "Total Actuation Cycles");
+
 bool u_request = 0;
 int u_speed_target = 100; //percentage beteween 30-100
 const int u_speed_target_lim1 = 30;
@@ -272,6 +276,9 @@ void setup() {
         dashboard.sendUpdates();
     });
 
+    Run_total.setTab(&totals_tab);
+    Cycles_total.setTab(&totals_tab);
+
     //reset.attachCallback([&](bool value){
         /* Print our new button value received from dashboard */
         //Serial.println("Button Triggered: "+String((value)?"true":"false"));
@@ -430,7 +437,7 @@ void loop() {
     if (u_speed_target < u_speed_target_lim1){
         u_speed_target = u_speed_target_lim1;
     }
-    if (u_speed_target > u_speed_target_lim2){
+    else if (u_speed_target > u_speed_target_lim2){
         u_speed_target = u_speed_target_lim2;
     }
     pwm_command = map(u_speed_target,0,100,0,255);
@@ -479,7 +486,7 @@ void loop() {
         }
         else if (u_actuations_target>0)
         {
-            Run_timer = 0;
+            Run_time = 0;
             u_timer_target = 0;
         }
         break;
@@ -493,6 +500,8 @@ void loop() {
         dash_millis =  millis();
         motor_speed.update((int)random(0, 50));
         actuations_progress.update((int)random(0, 100));
+        Run_total.update((int)random(0, 10000));
+        Cycles_total.update((int)random(0, 10000));
         dashboard.sendUpdates();
     }
 
