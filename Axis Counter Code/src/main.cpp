@@ -296,17 +296,16 @@ void setup() {
     timer_target.attachCallback([&](const char* value){
 
         std::string u_timer_target_str = value;
+    try{ //if user input does not convert successfully
         std::string::size_type pos = u_timer_target_str.find(":");
         std::string u_timer_target_str_h = u_timer_target_str.substr(0, pos);  // before deliminter token
         std::string u_timer_target_str_m = u_timer_target_str.substr(pos + 1); // after delimiter token
-
         int u_timer_target_h = std::stoi(u_timer_target_str_h);
+        int u_timer_target_m = std::stoi(u_timer_target_str_m);
         if (u_timer_target_h>u_timer_max_h)
         {
             u_timer_target_h = u_timer_max_h;
         }
-        
-        int u_timer_target_m = std::stoi(u_timer_target_str_m);
         if (u_timer_target_m>u_timer_max_m)
         {
             u_timer_target_m = u_timer_max_m;
@@ -316,6 +315,10 @@ void setup() {
         timer_target.update(String(u_timer_target_str.c_str()));
 
         dashboard.sendUpdates();
+    }
+    catch (std::invalid_argument e){
+        //do nothing
+    }
     });
 
     Run_total.setTab(&totals_tab);
