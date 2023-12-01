@@ -296,6 +296,13 @@ void setup() {
     timer_target.attachCallback([&](const char* value){
 
         std::string u_timer_target_str = value;
+        /*
+        #include <regex>
+        std::string in = "5:18";
+        std::regex time_expr("^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$");
+        std::smatch base_match;
+        std::regex_match(in, base_match, time_expr)
+        */
     try{ //if user input does not convert successfully
         std::string::size_type pos = u_timer_target_str.find(":");
         std::string u_timer_target_str_h = u_timer_target_str.substr(0, pos);  // before deliminter token
