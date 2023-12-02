@@ -9,6 +9,7 @@
 #include <regex>
 #include <TimeLib.h>
 #include <time.h>
+#include <eng_format.hpp>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -89,7 +90,7 @@ volatile double Cycles_done = 0;
 volatile double Cycles_done_total = 0; // not resettable unless powered down
 unsigned long Run_time = 0;
 unsigned long Run_time_total = 0;  // not resettable unless powered down
-char Run_time_total_txt[15];
+char Run_time_total_str[15];
 unsigned long timer_start = 0;
 //TODO eeprom non-volatile memeory for cycle time count
 
@@ -151,14 +152,14 @@ void counterSetup() {
 
 void time_string(){
     if (day()-1>0){
-        snprintf(Run_time_total_txt,15, "%ud %uh %um %us", day()-1, hour(), minute(), second());
+        snprintf(Run_time_total_str,15, "%ud %uh %um %us", day()-1, hour(), minute(), second());
     }
     else if (hour()>0)
     {
-        snprintf(Run_time_total_txt,15, "%uh %um %us", hour(), minute(), second());
+        snprintf(Run_time_total_str,15, "%uh %um %us", hour(), minute(), second());
     }
     else{
-        snprintf(Run_time_total_txt,15, "%um %us", minute(), second());
+        snprintf(Run_time_total_str,15, "%um %us", minute(), second());
     }
 }
 
@@ -185,11 +186,11 @@ void setup() {
     int n = WiFi.scanNetworks();
     Serial.println("scan done");
     if (n == 0)
-        Serial.println("no networks found");
+        Serial.println("No networks found");
     else
     {
         Serial.print(n);
-        Serial.println(" networks found");
+        Serial.println("Networks found");
         for (int i = 0; i < n; ++i)
         {
         // Print SSID and RSSI for each network found
@@ -311,23 +312,17 @@ void loop() {
     display.setTextSize(1);
     display.setTextColor(WHITE);
     display.setCursor(0,0);
-    String displayCycles = "Cyc:";
-    //displayCycles = displayCycles + Cycles_done;
-    display.print(displayCycles);
-    display.println(Cycles_done);
-    display.print("rpm:");
+
+    Cycles_done += 1000.0; //for display testing only
+    std::string Cycles_done_str = to_engineering_string(Cycles_done,0, eng_prefixed);
+    display.print("Cyc:");
+    display.println(String(Cycles_done_str.c_str()));
+
+    display.print("RPM:");
     display.println(rpm);
-    //display.println(totalEncoderPos);
-    /*
-    display.print(hour());
-    display.print("h ");
-    display.print(minute());
-    display.print("m ");
-    display.print(second());
-    display.println("s");
-    */
+
     time_string(); //update display time string
-    display.println(Run_time_total_txt);
+    display.println(Run_time_total_str);
     /*display.println("abcdef");
     display.println("------");*/
     display.println(myIP);
@@ -414,7 +409,7 @@ void loop() {
         motor_speed.update((int)random(0, 50));
         actuations_progress.update((int)random(0, 100));
         
-        Run_total.update(Run_time_total_txt);
+        Run_total.update(Run_time_total_str);
         Cycles_total.update((int)random(0, 10000));
         
         dashboard.sendUpdates();
