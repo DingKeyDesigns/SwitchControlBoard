@@ -89,6 +89,7 @@ unsigned long Run_time = 0;
 unsigned long Run_time_total = 0;  // not resettable unless powered down
 char Run_time_total_txt[15];
 unsigned long timer_start = 0;
+//TODO eeprom non-volatile memeory for cycle time count
 
 //Motor Control
 #define MOTOR_PWM D7
@@ -160,8 +161,6 @@ void time_string(){
     else{
         snprintf(Run_time_total_txt,15, "%um %us", minute(), second());
     }
-    
-
 }
 
 void setup() {
@@ -225,7 +224,7 @@ void setup() {
     motor_speed_target.update(u_speed_target); //default speed
     
     dashboard.setTitle("DingKey Designs");
-    
+
     start_stop.attachCallback([&](int value){
         /* Print our new button value received from dashboard */
         //Serial.println("Button Triggered: "+String((value)?"true":"false"));
@@ -234,7 +233,6 @@ void setup() {
         start_stop.update(value);
         dashboard.sendUpdates();
     });
-    
     motor_speed_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
         u_speed_target = value;
@@ -254,98 +252,25 @@ void setup() {
     timer_target.attachCallback([&](const char* value){
 
         std::string u_timer_target_str = value;
-        /*
-        
-        std::string in = "5:18";
         std::regex time_expr("^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$");
         std::smatch base_match;
-        std::regex_match(in, base_match, time_expr)
-        */
-    try{ //if user input does not convert successfully
-        std::string::size_type pos = u_timer_target_str.find(":");
-        std::string u_timer_target_str_h = u_timer_target_str.substr(0, pos);  // before deliminter token
-        std::string u_timer_target_str_m = u_timer_target_str.substr(pos + 1); // after delimiter token
-        int u_timer_target_h = std::stoi(u_timer_target_str_h);
-        int u_timer_target_m = std::stoi(u_timer_target_str_m);
-        if (u_timer_target_h>u_timer_max_h)
-        {
-            u_timer_target_h = u_timer_max_h;
+        if (std::regex_match(u_timer_target_str, base_match, time_expr)){
+            std::string::size_type pos = u_timer_target_str.find(":");
+            std::string u_timer_target_str_h = u_timer_target_str.substr(0, pos);  // before deliminter token
+            std::string u_timer_target_str_m = u_timer_target_str.substr(pos + 1); // after delimiter token
+            int u_timer_target_h = std::stoi(u_timer_target_str_h);
+            int u_timer_target_m = std::stoi(u_timer_target_str_m);
+            u_timer_target_str = std::to_string(u_timer_target_h) + ":" + std::to_string(u_timer_target_m);
+            timer_target.update(String(u_timer_target_str.c_str()));
         }
-        if (u_timer_target_m>u_timer_max_m)
-        {
-            u_timer_target_m = u_timer_max_m;
+        else{
+            timer_target.update("Incorrect Format");
         }
-
-        u_timer_target_str = std::to_string(u_timer_target_h) + ":" + std::to_string(u_timer_target_m);
-        timer_target.update(String(u_timer_target_str.c_str()));
-
         dashboard.sendUpdates();
-    }
-    catch (std::invalid_argument e){
-        //do nothing
-    }
     });
 
     Run_total.setTab(&totals_tab);
     Cycles_total.setTab(&totals_tab);
-
-/*
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/html", index_html);
-  });
-
-  // Send a GET request to <ESP_IP>/get?input1=<inputMessage>
-  server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) {
-    String inputA;
-    String inputB;
-    String inputC;
-    String inputParam;
-    String inputParam1;
-    String inputParam2;
-    String inputParam3;
-    // GET input1 value on <ESP_IP>/get?input1=<inputMessage>
-    if (request->hasParam(PARAM_INPUT_1)) {
-      inputA = request->getParam(PARAM_INPUT_1)->value();
-      if (inputA[0] != '\0') {
-        percent = inputA.toInt();
-        inputParam1 = PARAM_INPUT_1;
-        requestFlag = 1;
-        pwm = (float)percent / 100 * 255;
-      }
-      analogWrite(D7, pwm);
-    }
-    // GET input2 value on <ESP_IP>/get?input2=<inputMessage>
-    if (request->hasParam(PARAM_INPUT_2)) {
-      inputB = request->getParam(PARAM_INPUT_2)->value();
-      if (inputB[0] != '\0') {
-        inputParam2 = PARAM_INPUT_2;
-        requestFlag = 1;
-        requestedCycles = inputB.toInt();
-      }
-    }
-    // GET input3 value on <ESP_IP>/get?input3=<inputMessage>
-    if (request->hasParam(PARAM_INPUT_3)) {
-      inputC = request->getParam(PARAM_INPUT_3)->value();
-      inputParam3 = PARAM_INPUT_3;
-      requestFlag = 1;
-    }
-    else {
-      inputA = "No message sent";
-      inputParam = "none";
-    }
-    Serial.println(inputA);
-    inputMessageFinal = inputA;
-    inputParam1 = "";
-    request->send(200, "text/html", "HTTP GET request sent to your ESP on input field <br>Speed Percentage: " 
-                                     + inputParam1 + percent + "<br>" 
-                                     + "Cycles to Run" + ": " + requestedCycles + "<br>"
-                                     + inputParam3 + ": " + inputC + "<br>"
-                                     + "<br><a href=\"/\">Return to Home Page</a>");
-  });
-  server.onNotFound(notFound);
-  server.begin();
-
-*/
 
     // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 64x48)
