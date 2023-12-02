@@ -6,6 +6,9 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <Rotary.h>
+#include <regex>
+#include <TimeLib.h>
+#include <time.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -15,9 +18,6 @@
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncTCP.h>
 #include <ESPDashPro.h>
-
-#include <TimeLib.h>
-#include <time.h>
 
 /* Unused variables
 // SCL GPIO5
@@ -126,49 +126,6 @@ int u_timer_max_h = 23; //requested timer maximum hours
 int u_timer_max_m = 59; //requested timer maximum minutes
 
 //float u_actuations_hour = 0; //actuations per hour
-
-// HTML web page to handle 3 input fields (input1, input2, input3)
-/*const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML><html><head>
-  <title>ESP Input Form</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  </head><body>
-  <form action="/get">
-    pwmInput <input type="text" name="pwm">
-    <input type="submit" value="Submit">
-  </form><br>
-  <form action="/get">
-    cyclesInput <input type="text" name="cycles">
-    <input type="submit" value="Submit">
-  </form><br>
-  <form action="/get">
-    input3: <input type="text" name="input3">
-    <input type="submit" value="Submit">
-  </form>
-</body></html>)rawliteral";
-*/
-/*
-const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML><html><head>
-  <title>ESP Input Form</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  </head><body>
-  <form action="/get">
-    Speed Percentage (0-100)<input type="number" name="pwm" min="0" max="100"><br>
-    Cycles to Run<input type="number" name="cycles" min="1"><br>
-    placeholder<input type="number" name="input3"><br><br>
-    <input type="submit" value="Submit">
-  </form>
-</body></html>)rawliteral";
-*/
-
-/* Just a little test message.  Go to http://192.168.4.1 in a web browser
-   connected to this access point to see it.
-*/
-/*void handleRoot() {
-  server.send(200, "text/html", "< h1 >You are connected");
-}*/
-
 
 IRAM_ATTR void doMotorEncoder() {
   unsigned char mresult = r.process();
@@ -297,7 +254,7 @@ void setup() {
 
         std::string u_timer_target_str = value;
         /*
-        #include <regex>
+        
         std::string in = "5:18";
         std::regex time_expr("^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$");
         std::smatch base_match;
