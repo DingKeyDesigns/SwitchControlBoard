@@ -36,6 +36,7 @@ const char* PARAM_INPUT_3 = "input3";
 String inputMessageFinal = "testMessage";
 int requestFlag = 0;
 volatile unsigned long requestedCycles = 0;
+#define CLICKS_PER_STEP 1s
 */
 
 //Screen Setup
@@ -69,7 +70,6 @@ void notFound(AsyncWebServerRequest *request) {
 //Rotary Encoder
 #define ROTARY_PIN1	D6
 #define ROTARY_PIN2	D5
-#define CLICKS_PER_STEP 1
 //#define STEPS_ROTATION 187.00 //170rpm  11 pulses per rotation, Gear ratio 176rpm 1:34, Gear Ratio 281rpm 1:21.3, divide by 2 two actuations per rotation
 #define STEPS_ROTATION 117.15 //281rpm 11 pulses per rotation, Gear ratio 176rpm 1:34, Gear Ratio 281rpm 1:21.3, divide by 2 two actuations per rotation
 Rotary r = Rotary(ROTARY_PIN1, ROTARY_PIN2);
@@ -77,12 +77,14 @@ Rotary r = Rotary(ROTARY_PIN1, ROTARY_PIN2);
 #define DIR_CCW 0x20
 volatile unsigned long MotorEncoderPos = 0;
 volatile unsigned long totalEncoderPos = 0;
+volatile unsigned long total_micros = 1;
 unsigned long lastEncoderPos = 0;
 unsigned long last_micros = 0;
 unsigned long Encoder_delta = 0;
 unsigned long micros_delta = 0;
 float rpm = 0;
 float cps = 0; // cycles per second
+float cph = 0; // cycles per hour
 volatile double Cycles_done = 0;
 volatile double Cycles_done_total = 0; // not resettable unless powered down
 unsigned long Run_time = 0;
@@ -106,10 +108,6 @@ const int u_speed_target_lim2 = 100;
 float u_progress = 0; //percentage completion between 0-100%
 unsigned long u_actuations_target = 0; //requested number of cycles
 unsigned long u_timer_target = 0; //requested timer
-int u_timer_max_h = 23; //requested timer maximum hours
-int u_timer_max_m = 59; //requested timer maximum minutes
-
-//float u_actuations_hour = 0; //actuations per hour
 
 // Dashboard Interface
 ESPDash dashboard(&server); //Attach ESP-DASH to AsyncWebServer
@@ -131,9 +129,10 @@ Card Cycles_total(&dashboard, GENERIC_CARD, "Total Actuation Cycles");
 
 IRAM_ATTR void doMotorEncoder() {
   unsigned char mresult = r.process();
-  if (mresult == DIR_CW) {
+  if (mresult == DIR_CW || mresult == DIR_CCW) {
     MotorEncoderPos++;
     totalEncoderPos++;
+    total_micros = micros(); // record time of measurement
     if (MotorEncoderPos >= STEPS_ROTATION) {  // 374=11 pulses per rev X 34 (gear ratio of the motor)
       Cycles_done += 1; // I incremented in twos but you can reduce it to 1 if pulses/rev is even number like 374 is. For increments of 1, replace 374 with 187
       MotorEncoderPos = 0;
@@ -147,7 +146,7 @@ void counterSetup() {
     r.begin(ROTARY_PIN1, ROTARY_PIN2);
     attachInterrupt(digitalPinToInterrupt(ROTARY_PIN1), doMotorEncoder, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ROTARY_PIN2), doMotorEncoder, CHANGE);
-    Serial.println("\n\nSimple Counter");
+    total_micros = micros(); //prevents divide by zero
 }
 
 void time_string(){
@@ -164,17 +163,11 @@ void time_string(){
 }
 
 void setup() {
-    pinMode(ROTARY_PIN1, INPUT_PULLUP);
-    pinMode(ROTARY_PIN2, INPUT_PULLUP);
-
     Serial.begin(115200);
     Serial.println("Begin test");
 
     pinMode(ledPin, OUTPUT);
     digitalWrite(ledPin, LOW); // LOW turns LED on
-
-    pinMode(ENABLE_PIN, OUTPUT);
-    digitalWrite(ENABLE_PIN, LOW);
 
 
     //Wifi Access Point
@@ -305,22 +298,15 @@ void setup() {
 
 void loop() {
     //server.handleClient();
-    // text display tests
-
-    // Original code:
-    // rpm = (((float)totalEncoderPos - (float)lastEncoderPos) / 234) *60.0 * (1000/(millis()-last_millis));
-    // lastEncoderPos = totalEncoderPos;
-    // last_millis = millis();
     
     Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
-    micros_delta =  micros()-last_micros; // uint subtraction overflow protection
+    micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
 
-    rpm = float(Encoder_delta) / float(STEPS_ROTATION) / (float(micros_delta)/1.00E6) * 60.0;
-    rpm = rpm/2.0; //2 cyles per rotation
     cps = float(Encoder_delta) / float(STEPS_ROTATION) / (float(micros_delta)/1.00E6); //cycles per second
+    rpm = cps * 60.0 / 2.0; // cycles per second * 60 / 2 cycles per rotation
     
     lastEncoderPos = totalEncoderPos;
-    last_micros = micros();
+    last_micros = total_micros;
 
     display.setTextSize(1);
     display.setTextColor(WHITE);
