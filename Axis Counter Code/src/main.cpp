@@ -34,6 +34,8 @@ const char* PARAM_INPUT_1 = "pwm";
 const char* PARAM_INPUT_2 = "cycles";
 const char* PARAM_INPUT_3 = "input3";
 String inputMessageFinal = "testMessage";
+int requestFlag = 0;
+volatile unsigned long requestedCycles = 0;
 */
 
 //Screen Setup
@@ -92,12 +94,23 @@ unsigned long timer_start = 0;
 #define MOTOR_PWM D7
 int pwm_command = 0;
 
-//User Control
-volatile unsigned long requestedCycles = 0;
+//State Machine
 int state=0;
 bool run_enable = 0;
-int requestFlag = 0;
 
+int u_request = 0;
+int u_speed_target = 100; //percentage beteween 30-100
+const int u_speed_target_lim1 = 30;
+const int u_speed_target_lim2 = 100;
+float u_progress = 0; //percentage completion between 0-100%
+unsigned long u_actuations_target = 0; //requested number of cycles
+unsigned long u_timer_target = 0; //requested timer
+int u_timer_max_h = 23; //requested timer maximum hours
+int u_timer_max_m = 59; //requested timer maximum minutes
+
+//float u_actuations_hour = 0; //actuations per hour
+
+// Dashboard Interface
 ESPDash dashboard(&server); //Attach ESP-DASH to AsyncWebServer
 unsigned long dash_millis = 0;
 unsigned long dash_millis_delta = 0;
@@ -114,18 +127,6 @@ Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes)");
 Tab totals_tab(&dashboard, "Totals");
 Card Run_total(&dashboard, GENERIC_CARD, "Total Run Time");
 Card Cycles_total(&dashboard, GENERIC_CARD, "Total Actuation Cycles");
-
-int u_request = 0;
-int u_speed_target = 100; //percentage beteween 30-100
-const int u_speed_target_lim1 = 30;
-const int u_speed_target_lim2 = 100;
-float u_progress = 0; //percentage completion between 0-100%
-unsigned long u_actuations_target = 0; //requested number of cycles
-unsigned long u_timer_target = 0; //requested timer
-int u_timer_max_h = 23; //requested timer maximum hours
-int u_timer_max_m = 59; //requested timer maximum minutes
-
-//float u_actuations_hour = 0; //actuations per hour
 
 IRAM_ATTR void doMotorEncoder() {
   unsigned char mresult = r.process();
