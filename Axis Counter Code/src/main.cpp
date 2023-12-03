@@ -96,7 +96,6 @@ char Run_time_total_str[15];
 unsigned long timer_start = 0;
 movingAvgFloat cps_mov_avg(10);
 
-
 //TODO eeprom non-volatile memeory for cycle time count
 
 //Motor Control
@@ -302,6 +301,7 @@ void setup() {
                 u_timer_target_str = std::to_string(u_timer_target_h) + ":" + std::to_string(u_timer_target_m);
             }
             timer_target.update(String(u_timer_target_str.c_str()));
+            u_timer_target = (u_timer_target_h*3600.0 + u_timer_target_m*60.0)*1000.0; // in millis
         }
         else{
             timer_target.update("Check  Input Format HH:MM");
@@ -408,65 +408,69 @@ void loop() {
     //State Machine Logic
     switch (state)
     {
-    case 0:
+    case 0: // Idle
         run_enable=0;
         if (u_request){
             state=1;
         }
         break;
     
-    case 1:
+    case 1: // Machine Run
         run_enable=1;
         if (u_actuations_target>0){
             state=2;
+            Cycles_done=0;
+            u_progress=0; //Reset progress upon entering state
         }
         else if (u_actuations_target>0){
             state=3;
             timer_start=millis();
+            u_progress=0; //Reset progress upon entering state
         }
         if (!u_request){
             state=0;
         }
         break;
     
-    case 2:
+    case 2: // Counter active
         run_enable=1;
+        u_progress = Cycles_done / u_actuations_target;
         if (!u_request || Cycles_done>=u_actuations_target){
             state=0;
-            Cycles_done=0;
         }
         else if (u_timer_target>0){
             timer_start=millis();
             u_actuations_target=0;
+            u_progress=0; //Reset progress upon entering state
         }
         break;
     
-    case 3:
+    case 3: // Timer Active
         run_enable=1;
+        Run_time = millis() - timer_start;
+        u_progress = Run_time / u_timer_target;
         if (!u_request || Run_time>=u_timer_target){
             state=0;
-            u_timer_target=0;
         }
         else if (u_actuations_target>0)
         {
-            Run_time = 0;
             u_timer_target = 0;
+            u_progress=0; //Reset progress upon entering state
         }
         break;
     }
-
     //Serial.println(pwm_command*run_enable);
     analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
 
     dash_millis_delta =  millis()-dash_millis;
     if (dash_millis_delta>= dash_interval) {
         dash_millis =  millis();
+        start_stop.update(run_enable); //dashboard update
         motor_speed.update(rpm);
-        actuations_progress.update((int)random(0, 100));
-        
+        actuations_progress.update(u_progress);
         Run_total.update(Run_time_total_str);
-        Cycles_total.update(Cycles_done_total);
-        
+        Cycles_total.update(displayLargeNum(Cycles_done_total));
+
         dashboard.sendUpdates();
     }
 
