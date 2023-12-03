@@ -10,6 +10,7 @@
 #include <TimeLib.h>
 #include <time.h>
 #include <eng_format.hpp>
+#include <movingAvgFloat.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -53,7 +54,7 @@ Adafruit_SSD1306 display(OLED_RESET);
 //Wifi Setup
 #ifndef APSSID
     #define APSSID "DingKeyWifi"
-    #define APPSK  "deeznuts"
+    #define APPSK  "keyboard"
 #endif
 const char *password = APPSK; //const char *ssid = APSSID;
 char ssidRand[25]; //String ssidRand = APSSID;
@@ -83,16 +84,17 @@ unsigned long lastEncoderPos = 0;
 unsigned long last_micros = 0;
 unsigned long Encoder_delta = 0;
 unsigned long micros_delta = 0;
-float rpm = 0;
 float cps = 0; // cycles per second
-float cph = 0; // cycles per hour
+float cps_avg = 0; // cycles per second, filtered
+float rpm = 0; // calculated from cps_avg
+float cph = 0; // calculated from cps_avg, cycles per hour
 volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
 volatile double Cycles_done_total = 0; // not resettable unless powered down
 unsigned long Run_time = 0;
 unsigned long Run_time_total = 0;  // not resettable unless powered down
 char Run_time_total_str[15];
 unsigned long timer_start = 0;
-//std::string Cycles_done_str;
+movingAvgFloat cps_mov_avg(10);
 
 
 //TODO eeprom non-volatile memeory for cycle time count
@@ -125,7 +127,7 @@ Card motor_speed_target(&dashboard, SLIDER_CARD, "Motor Speed", "%", 30, 100);
 
 Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "", 0, 1000);
 Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000000);
-Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes)");
+Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes, HH:MM)");
 
 Tab totals_tab(&dashboard, "Totals");
 Card Run_total(&dashboard, GENERIC_CARD, "Total Run Time");
@@ -139,6 +141,7 @@ IRAM_ATTR void doMotorEncoder() {
     //total_micros = micros(); // record time of measurement
     if (MotorEncoderPos >= STEPS_ROTATION) {  // 374=11 pulses per rev X 34 (gear ratio of the motor)
       Cycles_done += 1; // I incremented in twos but you can reduce it to 1 if pulses/rev is even number like 374 is. For increments of 1, replace 374 with 187
+      Cycles_done_total += 1;
       MotorEncoderPos = 0;
     }
   }
@@ -166,7 +169,7 @@ void time_string(){
     }
 }
 
-String display_num(double num){
+String displayLargeNum(double num){
      // Format number for user display
      // Set number of displayed digits without trailing zeros, down to precision of 1.0
 
@@ -219,7 +222,6 @@ void setup() {
     //ssidRand = ssidRand + randSSID;
     //ssid = ssidRand;
     /* You can remove the password parameter if you want the AP to be open. */
-    
     
     // Example from https://arduino.stackexchange.com/questions/43044/esp8266-check-if-a-ssid-is-in-range
     int n = WiFi.scanNetworks();
@@ -293,11 +295,16 @@ void setup() {
             std::string u_timer_target_str_m = u_timer_target_str.substr(pos + 1); // after delimiter token
             int u_timer_target_h = std::stoi(u_timer_target_str_h);
             int u_timer_target_m = std::stoi(u_timer_target_str_m);
-            u_timer_target_str = std::to_string(u_timer_target_h) + ":" + std::to_string(u_timer_target_m);
+            if (u_timer_target_m<10){ //pad additional 0 in output
+                u_timer_target_str = std::to_string(u_timer_target_h) + ":" + "0" + std::to_string(u_timer_target_m);
+            }
+            else{
+                u_timer_target_str = std::to_string(u_timer_target_h) + ":" + std::to_string(u_timer_target_m);
+            }
             timer_target.update(String(u_timer_target_str.c_str()));
         }
         else{
-            timer_target.update("Incorrect Format");
+            timer_target.update("Check  Input Format HH:MM");
         }
         dashboard.sendUpdates();
     });
@@ -308,7 +315,6 @@ void setup() {
     // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 64x48)
     // init done
-
     //display.display();
     display.clearDisplay();
     display.setTextSize(1.25);
@@ -337,6 +343,8 @@ void setup() {
     display.setTextSize(1);
     display.setTextColor(WHITE);
     display.setCursor(0,0);
+    
+    cps_mov_avg.begin();
 }
 
 void loop() {
@@ -346,7 +354,11 @@ void loop() {
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
 
     cps = float(Encoder_delta) / float(STEPS_ROTATION) / (float(micros_delta)/1.00E6); //cycles per second
-    rpm = cps * 60.0 / 2.0; // cycles per second * 60 / 2 cycles per rotation
+    cps_avg = cps_mov_avg.reading(cps); // moving average filter
+    cph = cps_avg * 3600.0; // cycles per second *60 *60 = cycles per hour
+    rpm = cps_avg * 60.0 / 2.0; // cycles per second * 60 / 2 cycles per rotation
+    
+    //TODO Moving average
     
     lastEncoderPos = totalEncoderPos;
     last_micros = total_micros;
@@ -358,7 +370,7 @@ void loop() {
     //Cycles_done_str = to_engineering_string(Cycles_done,display_prec, eng_prefixed);
     //display.print("Cyc:");
     //display.println(String(Cycles_done_str.c_str()));
-    display.println(display_num(Cycles_done));
+    display.println(displayLargeNum(Cycles_done));
 
     display.print("RPM:");
     display.println(rpm);
@@ -449,11 +461,11 @@ void loop() {
     dash_millis_delta =  millis()-dash_millis;
     if (dash_millis_delta>= dash_interval) {
         dash_millis =  millis();
-        motor_speed.update((int)random(0, 50));
+        motor_speed.update(rpm);
         actuations_progress.update((int)random(0, 100));
         
         Run_total.update(Run_time_total_str);
-        Cycles_total.update((int)random(0, 10000));
+        Cycles_total.update(Cycles_done_total);
         
         dashboard.sendUpdates();
     }
