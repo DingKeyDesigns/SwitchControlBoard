@@ -304,7 +304,7 @@ void setup() {
             u_timer_target = (u_timer_target_h*3600.0 + u_timer_target_m*60.0)*1000.0; // in millis
         }
         else{
-            timer_target.update("Check  Input Format HH:MM");
+            timer_target.update("Check Input Format HH:MM");
         }
         dashboard.sendUpdates();
     });
@@ -434,7 +434,7 @@ void loop() {
     
     case 2: // Counter active
         run_enable=1;
-        u_progress = Cycles_done / u_actuations_target;
+        u_progress = (float)Cycles_done / (float)u_actuations_target*100.0;
         if (!u_request || Cycles_done>=u_actuations_target){
             state=0;
         }
@@ -448,7 +448,7 @@ void loop() {
     case 3: // Timer Active
         run_enable=1;
         Run_time = millis() - timer_start;
-        u_progress = Run_time / u_timer_target;
+        u_progress = (float)Run_time / (float)u_timer_target*100.0;
         if (!u_request || Run_time>=u_timer_target){
             state=0;
         }
