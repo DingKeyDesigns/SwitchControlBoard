@@ -86,12 +86,15 @@ unsigned long micros_delta = 0;
 float rpm = 0;
 float cps = 0; // cycles per second
 float cph = 0; // cycles per hour
-volatile double Cycles_done = 0;
+volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
 volatile double Cycles_done_total = 0; // not resettable unless powered down
 unsigned long Run_time = 0;
 unsigned long Run_time_total = 0;  // not resettable unless powered down
 char Run_time_total_str[15];
 unsigned long timer_start = 0;
+//std::string Cycles_done_str;
+
+
 //TODO eeprom non-volatile memeory for cycle time count
 
 //Motor Control
@@ -133,7 +136,7 @@ IRAM_ATTR void doMotorEncoder() {
   if (mresult == DIR_CW || mresult == DIR_CCW) {
     MotorEncoderPos++;
     totalEncoderPos++;
-    total_micros = micros(); // record time of measurement
+    //total_micros = micros(); // record time of measurement
     if (MotorEncoderPos >= STEPS_ROTATION) {  // 374=11 pulses per rev X 34 (gear ratio of the motor)
       Cycles_done += 1; // I incremented in twos but you can reduce it to 1 if pulses/rev is even number like 374 is. For increments of 1, replace 374 with 187
       MotorEncoderPos = 0;
@@ -152,24 +155,60 @@ void counterSetup() {
 
 void time_string(){
     if (day()-1>0){
-        snprintf(Run_time_total_str,15, "%ud %uh %um %us", day()-1, hour(), minute(), second());
+        snprintf(Run_time_total_str,15, "%u:%u:%u:%u", day()-1, hour(), minute(), second());
     }
     else if (hour()>0)
     {
-        snprintf(Run_time_total_str,15, "%uh %um %us", hour(), minute(), second());
+        snprintf(Run_time_total_str,15, "%u:%u:%u", hour(), minute(), second());
     }
     else{
         snprintf(Run_time_total_str,15, "%um %us", minute(), second());
     }
 }
 
+String display_num(double num){
+     // Format number for user display
+     // Set number of displayed digits without trailing zeros, down to precision of 1.0
+
+    int display_prec = 1; // for number of cycles display precision
+
+    if (num<10){
+        display_prec = 1;
+    }
+    else if (num<100)
+    {
+        num = 2;
+    }
+    else if (num<1000)
+    {
+        display_prec = 3;
+    }
+    else if (num<10000)
+    {
+        display_prec = 4;
+    }
+    else if (num<100000)
+    {
+        display_prec = 5;
+    }
+    else if (num<1000000)
+    {
+        display_prec = 6;
+    }
+    else
+    {
+        display_prec = 7;
+    }
+    std::string num_str = to_engineering_string(Cycles_done,display_prec, eng_prefixed);
+    
+    return String(num_str.c_str());
+}
+
 void setup() {
     Serial.begin(115200);
-    Serial.println("Begin test");
 
     pinMode(ledPin, OUTPUT);
     digitalWrite(ledPin, LOW); // LOW turns LED on
-
 
     //Wifi Access Point
     int id_suffix = 1;
@@ -295,11 +334,14 @@ void setup() {
     display.display();
     delay(2000);
     display.clearDisplay();*/
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0,0);
 }
 
 void loop() {
     //server.handleClient();
-    
+    total_micros = micros();
     Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
 
@@ -312,19 +354,20 @@ void loop() {
     display.setTextSize(1);
     display.setTextColor(WHITE);
     display.setCursor(0,0);
-
-    Cycles_done += 1000.0; //for display testing only
-    std::string Cycles_done_str = to_engineering_string(Cycles_done,0, eng_prefixed);
-    display.print("Cyc:");
-    display.println(String(Cycles_done_str.c_str()));
+    
+    //Cycles_done_str = to_engineering_string(Cycles_done,display_prec, eng_prefixed);
+    //display.print("Cyc:");
+    //display.println(String(Cycles_done_str.c_str()));
+    display.println(display_num(Cycles_done));
 
     display.print("RPM:");
     display.println(rpm);
+    Serial.println(rpm);
+    Serial.println(total_micros);
 
     time_string(); //update display time string
     display.println(Run_time_total_str);
-    /*display.println("abcdef");
-    display.println("------");*/
+
     display.println(myIP);
     display.display();
     //delay(100);
@@ -400,7 +443,7 @@ void loop() {
         break;
     }
 
-    Serial.println(pwm_command*run_enable);
+    //Serial.println(pwm_command*run_enable);
     analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
 
     dash_millis_delta =  millis()-dash_millis;
