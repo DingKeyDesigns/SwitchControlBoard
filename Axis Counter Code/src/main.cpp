@@ -335,9 +335,7 @@ void setup() {
 
 void loop() {
     //server.handleClient();
-    if (run_enable){
-        Cycles_done += 1; //displaytesting only, simulated cycles
-    }
+    
     total_micros = micros();
     Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
@@ -363,8 +361,7 @@ void loop() {
     display.println(cph_str);
     //Serial.println(rpm);
     //Serial.println(total_micros);
-    Serial.println(Run_time);
-    Serial.println(u_timer_target);
+    
 
     time_string(); //update display time string
     display.println(Run_time_total_str);
@@ -448,8 +445,19 @@ void loop() {
         }
         break;
     }
+    Serial.println('debug');
+    Serial.println(state);
+    Serial.println(run_enable);
+    Serial.println(Run_time);
+    Serial.println(u_timer_target);
+
+    //Motor Command
     //Serial.println(pwm_command*run_enable);
     analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
+    //Simulated Cycles
+    if (run_enable){
+        Cycles_done += 1; //displaytesting only, simulated cycles
+    }
 
     dash_millis_delta =  millis()-dash_millis;
     if (dash_millis_delta>= dash_interval) {
