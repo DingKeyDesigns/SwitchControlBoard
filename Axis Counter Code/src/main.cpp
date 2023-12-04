@@ -86,7 +86,7 @@ unsigned long Encoder_delta = 0;
 unsigned long micros_delta = 0;
 float cps = 0; // cycles per second
 float cps_avg = 0; // cycles per second, filtered
-movingAvgFloat cps_mov_avg(10);
+movingAvgFloat cps_mov_avg(50);
 float rpm = 0; // calculated from smoothed cps_avg
 char rpm_str[6];
 float cph = 0; // calculated from additional smoothed cps_avg, cycles per hour
@@ -219,50 +219,44 @@ void setup() {
     //Wifi Access Point
     int id_suffix = 1;
     Serial.print("Configuring access point...");
-    // int randSSID = random(1,9999);
     snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix);
-    //Serial.println(ssidRand);
-    //ssidRand = ssidRand + randSSID;
-    //ssid = ssidRand;
-    /* You can remove the password parameter if you want the AP to be open. */
-    
+
     // Example from https://arduino.stackexchange.com/questions/43044/esp8266-check-if-a-ssid-is-in-range
     int n = WiFi.scanNetworks();
     Serial.println("scan done");
     if (n == 0)
+    {
         Serial.println("No networks found");
+    }
     else
     {
         Serial.print(n);
         Serial.println("Networks found");
         for (int i = 0; i < n; ++i)
         {
-        // Print SSID and RSSI for each network found
-        Serial.println(WiFi.SSID(i));
-            if(WiFi.SSID(i) == ssidRand){ //enter the ssid which you want to search
-                Serial.println("Existing network found");
-                id_suffix++; // increment to next wifi
+        Serial.println(WiFi.SSID(i)); // Print SSID and RSSI for each network found
+            if(WiFi.SSID(i) == ssidRand) //enter the ssid that matches assigned name
+            {
+                Serial.println("Existing DingKey network found");
+                id_suffix++; // increment to next wifi suffix
                 snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix); //update with newest increment
             }
         }
-        
     }
-    
+
     WiFi.softAPConfig(local_IP, gateway, subnet);
     WiFi.softAP(ssidRand, password);
-
     myIP = WiFi.softAPIP();
     Serial.println("HTTP server started");
     Serial.print("AP IP address: ");
     Serial.println(myIP);
     //server.on("/", handleRoot);
     server.begin();
-    
-    start_stop.update(true); // initial state is machine running
+
+    start_stop.update(true); // initial state is machine running, without any user input
     motor_speed_target.update(u_speed_target); //default speed
     
     dashboard.setTitle("DingKey Designs");
-
     start_stop.attachCallback([&](int value){
         /* Print our new button value received from dashboard */
         //Serial.println("Button Triggered: "+String((value)?"true":"false"));
@@ -277,7 +271,6 @@ void setup() {
         motor_speed_target.update(value);
         dashboard.sendUpdates();
     });
-
     actuations_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
         //value = value/1000*1000; // round to nearest 1000 disabled for displaytesting only
@@ -285,7 +278,6 @@ void setup() {
         actuations_target.update(value);
         dashboard.sendUpdates();
     });
-
     // Timer input needs to be in HH:MM format
     timer_target.attachCallback([&](const char* value){
 
@@ -318,10 +310,8 @@ void setup() {
 
     // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 64x48)
-    // init done
-    //display.display();
     display.clearDisplay();
-    display.setTextSize(1.25);
+    display.setTextSize(1);
     display.setTextColor(WHITE);
     display.setCursor(0,0);
     display.println("DingKey");
@@ -336,14 +326,6 @@ void setup() {
     display.clearDisplay();
     display.display();
     counterSetup();
-    // text display tests
-    /*display.setTextSize(1);
-    display.setTextColor(WHITE);
-    display.setCursor(0,0);
-    display.println(inputMessageFinal);
-    display.display();
-    delay(2000);
-    display.clearDisplay();*/
     display.setTextSize(1);
     display.setTextColor(WHITE);
     display.setCursor(0,0);
@@ -353,7 +335,9 @@ void setup() {
 
 void loop() {
     //server.handleClient();
-    //Cycles_done += 101; //displaytesting only
+    if (run_enable){
+        Cycles_done += 101; //displaytesting only, simulated cycles
+    }
     total_micros = micros();
     Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
