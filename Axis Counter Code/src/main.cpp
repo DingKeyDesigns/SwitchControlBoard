@@ -88,7 +88,7 @@ float cps = 0; // cycles per second
 float cps_avg = 0; // cycles per second, filtered
 movingAvgFloat cps_mov_avg(10);
 float rpm = 0; // calculated from smoothed cps_avg
-char rpm_str[5];
+char rpm_str[6];
 float cph = 0; // calculated from additional smoothed cps_avg, cycles per hour
 char cph_str[10];
 volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
@@ -128,7 +128,8 @@ Card motor_speed(&dashboard, GENERIC_CARD, "Motor Speed", "rpm");
 Card motor_speed_target(&dashboard, SLIDER_CARD, "Motor Speed", "%", 30, 100);
 
 Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "%", 0, 100);
-Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000000);
+//Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000000);
+Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000); //displaytesting only
 Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes, HH:MM)");
 
 Tab totals_tab(&dashboard, "Totals");
@@ -279,7 +280,7 @@ void setup() {
 
     actuations_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
-        value = value/1000*1000; // round to nearest 1000
+        //value = value/1000*1000; // round to nearest 1000 disabled for displaytesting only
         u_actuations_target = value;
         actuations_target.update(value);
         dashboard.sendUpdates();
@@ -352,7 +353,7 @@ void setup() {
 
 void loop() {
     //server.handleClient();
-    Cycles_done += 101; //displaytesting only
+    //Cycles_done += 101; //displaytesting only
     total_micros = micros();
     Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
@@ -372,7 +373,7 @@ void loop() {
     display.println(displayLargeNum(Cycles_done));
 
     display.print("RPM:");
-    snprintf(rpm_str,5,"%.1f",rpm);
+    snprintf(rpm_str,6,"%.1f",rpm);
     display.println(rpm_str);
     snprintf(cph_str,10,"%.0f",cph);
     display.println(cph_str);
