@@ -106,7 +106,7 @@ int pwm_command = 0;
 
 //State Machine
 int state=0;
-bool run_enable = 0;
+bool run_enable = 1; //start in running status
 
 int u_request = 0;
 int u_speed_target = 100; //percentage beteween 30-100
@@ -253,7 +253,7 @@ void setup() {
     //server.on("/", handleRoot);
     server.begin();
 
-    start_stop.update(true); // initial state is machine running, without any user input
+    start_stop.update(run_enable); // initial state is machine running, without any user input
     motor_speed_target.update(u_speed_target); //default speed
     
     dashboard.setTitle("DingKey Designs");
@@ -336,7 +336,7 @@ void setup() {
 void loop() {
     //server.handleClient();
     if (run_enable){
-        Cycles_done += 101; //displaytesting only, simulated cycles
+        Cycles_done += 1; //displaytesting only, simulated cycles
     }
     total_micros = micros();
     Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
