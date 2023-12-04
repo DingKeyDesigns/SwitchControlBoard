@@ -417,7 +417,8 @@ void loop() {
         if (!u_request || Cycles_done>=u_actuations_target){
             state=0;
             run_enable=0;
-            start_stop.update(run_enable); //dashboard update
+            u_request=0;
+            start_stop.update(u_request); //dashboard update
             dashboard.sendUpdates();
         }
         else if (u_timer_target>0){
@@ -436,7 +437,8 @@ void loop() {
         if (!u_request || Run_time>=u_timer_target){
             state=0;
             run_enable=0;
-            start_stop.update(run_enable); //dashboard update
+            u_request=0;
+            start_stop.update(u_request); //dashboard update
             dashboard.sendUpdates();
         }
         else if (u_actuations_target>0)
