@@ -421,6 +421,7 @@ void loop() {
             dashboard.sendUpdates();
         }
         else if (u_timer_target>0){
+            state=3;
             timer_start=millis();
             u_actuations_target=0;
             u_progress=0; //Reset progress upon entering state
@@ -440,12 +441,13 @@ void loop() {
         }
         else if (u_actuations_target>0)
         {
-            u_timer_target = 0;
+            state=2;
+            u_timer_target=0;
             u_progress=0; //Reset progress upon entering state
         }
         break;
     }
-    Serial.println('debug');
+    Serial.println("debug");
     Serial.println(state);
     Serial.println(run_enable);
     Serial.println(Run_time);
