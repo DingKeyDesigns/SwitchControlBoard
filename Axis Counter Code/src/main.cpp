@@ -86,15 +86,17 @@ unsigned long Encoder_delta = 0;
 unsigned long micros_delta = 0;
 float cps = 0; // cycles per second
 float cps_avg = 0; // cycles per second, filtered
-float rpm = 0; // calculated from cps_avg
-float cph = 0; // calculated from cps_avg, cycles per hour
+movingAvgFloat cps_mov_avg(10);
+float rpm = 0; // calculated from smoothed cps_avg
+char rpm_str[5];
+float cph = 0; // calculated from additional smoothed cps_avg, cycles per hour
+char cph_str[10];
 volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
-volatile double Cycles_done_total = 0; // not resettable unless powered down
+volatile double Cycles_done_total = 0; // not resettable unless powered down or reset buton on totals page TODO
 unsigned long Run_time = 0;
 unsigned long Run_time_total = 0;  // not resettable unless powered down
 char Run_time_total_str[15];
 unsigned long timer_start = 0;
-movingAvgFloat cps_mov_avg(10);
 
 //TODO eeprom non-volatile memeory for cycle time count
 
@@ -122,9 +124,10 @@ const int dash_interval = 350;//update interval millis
 
 Card start_stop(&dashboard, BUTTON_CARD, "Start/Stop");
 Card motor_speed(&dashboard, GENERIC_CARD, "Motor Speed", "rpm");
+//Card cycle_speed(&dashboard, GENERIC_CARD, "Actuations Speed", "per hour");
 Card motor_speed_target(&dashboard, SLIDER_CARD, "Motor Speed", "%", 30, 100);
 
-Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "", 0, 1000);
+Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "%", 0, 100);
 Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000000);
 Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes, HH:MM)");
 
@@ -301,7 +304,7 @@ void setup() {
                 u_timer_target_str = std::to_string(u_timer_target_h) + ":" + std::to_string(u_timer_target_m);
             }
             timer_target.update(String(u_timer_target_str.c_str()));
-            u_timer_target = (u_timer_target_h*3600.0 + u_timer_target_m*60.0)*1000.0; // in millis
+            u_timer_target = (u_timer_target_h*3600 + u_timer_target_m*60)*1000; // in millis
         }
         else{
             timer_target.update("Check Input Format HH:MM");
@@ -349,6 +352,7 @@ void setup() {
 
 void loop() {
     //server.handleClient();
+    Cycles_done += 101; //displaytesting only
     total_micros = micros();
     Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
@@ -358,8 +362,6 @@ void loop() {
     cph = cps_avg * 3600.0; // cycles per second *60 *60 = cycles per hour
     rpm = cps_avg * 60.0 / 2.0; // cycles per second * 60 / 2 cycles per rotation
     
-    //TODO Moving average
-    
     lastEncoderPos = totalEncoderPos;
     last_micros = total_micros;
 
@@ -367,35 +369,29 @@ void loop() {
     display.setTextColor(WHITE);
     display.setCursor(0,0);
     
-    //Cycles_done_str = to_engineering_string(Cycles_done,display_prec, eng_prefixed);
-    //display.print("Cyc:");
-    //display.println(String(Cycles_done_str.c_str()));
     display.println(displayLargeNum(Cycles_done));
 
     display.print("RPM:");
-    display.println(rpm);
-    Serial.println(rpm);
-    Serial.println(total_micros);
+    snprintf(rpm_str,5,"%.1f",rpm);
+    display.println(rpm_str);
+    snprintf(cph_str,10,"%.0f",cph);
+    display.println(cph_str);
+    //Serial.println(rpm);
+    //Serial.println(total_micros);
+    Serial.println(Run_time);
+    Serial.println(u_timer_target);
 
     time_string(); //update display time string
     display.println(Run_time_total_str);
 
     display.println(myIP);
     display.display();
-    //delay(100);
+
     display.clearDisplay();
     //analogWrite(D7, pwm);
     //r.loop();
     
     // Motor Control
-    /*
-    if (requestFlag == 1 && Cycles_done >= requestedCycles) {
-        analogWrite(D7, 0);
-        requestFlag = 0;
-        Cycles_done = 0;
-    }
-    */
-    // Speed Control
     // Speed targets between 30% and 100%
     if (u_speed_target < u_speed_target_lim1){
         u_speed_target = u_speed_target_lim1;
@@ -435,8 +431,12 @@ void loop() {
     case 2: // Counter active
         run_enable=1;
         u_progress = (float)Cycles_done / (float)u_actuations_target*100.0;
+        
         if (!u_request || Cycles_done>=u_actuations_target){
             state=0;
+            run_enable=0;
+            start_stop.update(run_enable); //dashboard update
+            dashboard.sendUpdates();
         }
         else if (u_timer_target>0){
             timer_start=millis();
@@ -449,8 +449,12 @@ void loop() {
         run_enable=1;
         Run_time = millis() - timer_start;
         u_progress = (float)Run_time / (float)u_timer_target*100.0;
+        
         if (!u_request || Run_time>=u_timer_target){
             state=0;
+            run_enable=0;
+            start_stop.update(run_enable); //dashboard update
+            dashboard.sendUpdates();
         }
         else if (u_actuations_target>0)
         {
@@ -466,7 +470,8 @@ void loop() {
     if (dash_millis_delta>= dash_interval) {
         dash_millis =  millis();
         start_stop.update(run_enable); //dashboard update
-        motor_speed.update(rpm);
+        motor_speed.update(rpm_str);
+        //cycle_speed.update(cph_str);
         actuations_progress.update(u_progress);
         Run_total.update(Run_time_total_str);
         Cycles_total.update(displayLargeNum(Cycles_done_total));
