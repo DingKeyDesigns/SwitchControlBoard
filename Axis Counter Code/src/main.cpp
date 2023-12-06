@@ -97,7 +97,6 @@ volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
 unsigned long Run_time_total = 0;  // not resettable unless powered down
 char Run_time_total_str[15];
 //unsigned long timer_start = 0;
-
 //TODO eeprom non-volatile memeory for cycle time count
 
 //Motor Control
