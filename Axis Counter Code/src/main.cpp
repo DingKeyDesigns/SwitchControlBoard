@@ -92,7 +92,7 @@ char rpm_str[6];
 float cph = 0; // calculated from additional smoothed cps_avg, cycles per hour
 char cph_str[10];
 volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
-volatile double Cycles_done_total = 0; // not resettable unless powered down or reset buton on totals page TODO
+//volatile double Cycles_done_total = 0; // not resettable unless powered down or reset buton on totals page TODO
 unsigned long Run_time = 0;
 unsigned long Run_time_total = 0;  // not resettable unless powered down
 char Run_time_total_str[15];
@@ -144,7 +144,7 @@ IRAM_ATTR void doMotorEncoder() {
     //total_micros = micros(); // record time of measurement
     if (MotorEncoderPos >= STEPS_ROTATION) {  // 374=11 pulses per rev X 34 (gear ratio of the motor)
       Cycles_done += 1; // I incremented in twos but you can reduce it to 1 if pulses/rev is even number like 374 is. For increments of 1, replace 374 with 187
-      Cycles_done_total += 1;
+      //Cycles_done_total += 1;
       MotorEncoderPos = 0;
     }
   }
@@ -397,8 +397,8 @@ void loop() {
         run_enable=1;
         if (u_actuations_target>0){
             state=2;
-            Cycles_done=0;
-            u_progress=0; //Reset progress upon entering state
+            //Cycles_done=0;
+            //u_progress=0; //Reset progress upon entering state
         }
         else if (u_actuations_target>0){
             state=3;
@@ -413,7 +413,9 @@ void loop() {
     case 2: // Counter active
         run_enable=1;
         u_progress = (float)Cycles_done / (float)u_actuations_target*100.0;
-        
+        if (u_progress>100.0){
+            u_progress = 100;
+        }
         if (!u_request || Cycles_done>=u_actuations_target){
             state=0;
             run_enable=0;
@@ -460,7 +462,7 @@ void loop() {
     analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
     //Simulated Cycles
     if (run_enable){
-        Cycles_done += 1; //displaytesting only, simulated cycles
+        Cycles_done += 101; //displaytesting only, simulated cycles
     }
 
     dash_millis_delta =  millis()-dash_millis;
@@ -471,7 +473,7 @@ void loop() {
         //cycle_speed.update(cph_str);
         actuations_progress.update(u_progress);
         Run_total.update(Run_time_total_str);
-        Cycles_total.update(displayLargeNum(Cycles_done_total));
+        Cycles_total.update(displayLargeNum(Cycles_done));
 
         dashboard.sendUpdates();
     }
