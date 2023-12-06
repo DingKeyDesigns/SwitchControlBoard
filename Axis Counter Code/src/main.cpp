@@ -258,9 +258,6 @@ void setup() {
     dashboard.setTitle("DingKey Designs");
 
     start_stop.attachCallback([&](int value){
-        /* Print our new button value received from dashboard */
-        //Serial.println("Button Triggered: "+String((value)?"true":"false"));
-        /* Make sure we update our button's value and send update to dashboard */
         u_request = value;
         start_stop.update(value);
         dashboard.sendUpdates();
@@ -306,6 +303,17 @@ void setup() {
         else{
             timer_target.update("Check Input Format HH:MM");
         }
+        dashboard.sendUpdates();
+    });
+    
+    Reset_total.attachCallback([&](int value){
+        state=0;
+        run_enable=0;
+        u_request=0;
+        Cycles_done = 0; //reset number of cycles
+        setTime(0); //reset clock
+        start_stop.update(0);
+        Reset_total.update(0); //return to zero after values are reset
         dashboard.sendUpdates();
     });
 
@@ -386,7 +394,7 @@ void loop() {
     else if (u_speed_target > u_speed_target_lim2){
         u_speed_target = u_speed_target_lim2;
     }
-    pwm_command = map(u_speed_target,0,100,0,255);
+    pwm_command = map(u_speed_target,0,100,0,255); // from 0-100 to 0-255
 
     //State Machine Logic
     switch (state)
@@ -467,7 +475,7 @@ void loop() {
     analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
     //Simulated Cycles
     if (run_enable){
-        Cycles_done += 101; //displaytesting only, simulated cycles
+        Cycles_done += 1; //displaytesting only, simulated cycles
     }
 
     dash_millis_delta =  millis()-dash_millis;
