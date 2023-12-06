@@ -411,7 +411,6 @@ void loop() {
         break;
     
     case 1: // Machine Run
-        
         if (u_actuations_target>0){
             state=2;
             //Cycles_done=0;
@@ -425,15 +424,12 @@ void loop() {
         if (!u_request){
             state=0;
         }
-
         run_enable=1;
         break;
     
     case 2: // Counter active
-        
         u_progress = (float)Cycles_done / (float)u_actuations_target*100.0;
         if (u_progress>=100.0){u_progress = 100;}
-        
         if (!u_request || Cycles_done>=u_actuations_target){
             state=0;
             run_enable=0;
@@ -447,17 +443,14 @@ void loop() {
             //u_actuations_target=0;
             //u_progress=0; //Reset progress upon entering state
         }
-
         run_enable=1;
         break;
     
     case 3: // Timer Active
-        
         //Run_time = millis() - timer_start;
         //u_progress = (float)Run_time / (float)u_timer_target*100.0;
         u_progress = (float)now() / (float)u_timer_target*100.0;
         if (u_progress>=100.0){u_progress = 100;}
-        
         if (!u_request || now()>=u_timer_target){
             state=0;
             run_enable=0;
@@ -471,7 +464,6 @@ void loop() {
             //u_timer_target=0;
             //u_progress=0; //Reset progress upon entering state
         }
-
         run_enable=1;
         break;
 
@@ -479,7 +471,6 @@ void loop() {
         
         u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), ((float)now()/(float)u_timer_target*100.0) );
         if (u_progress>=100.0){u_progress = 100;}
-
         if (!u_request || u_progress>=100.0){
             state=0;
             run_enable=0;
@@ -493,9 +484,8 @@ void loop() {
         if (u_actuations_target <= 0){
             state = 3; //timer only
         }
-
         run_enable = 1;
-
+        break;
     }
     Serial.println("debug");
     Serial.println(state);
