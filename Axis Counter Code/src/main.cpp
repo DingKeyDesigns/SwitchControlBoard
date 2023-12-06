@@ -93,7 +93,7 @@ float cph = 0; // calculated from additional smoothed cps_avg, cycles per hour
 char cph_str[10];
 volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
 //volatile double Cycles_done_total = 0; // not resettable unless powered down or reset buton on totals page TODO
-unsigned long Run_time = 0;
+//unsigned long Run_time = 0;
 unsigned long Run_time_total = 0;  // not resettable unless powered down
 char Run_time_total_str[15];
 unsigned long timer_start = 0;
@@ -106,7 +106,7 @@ int pwm_command = 0;
 
 //State Machine
 int state=0;
-bool run_enable = 1; //start in running status
+bool run_enable = 1; //start in running status TODO this feature is not working
 
 int u_request = 0;
 int u_speed_target = 100; //percentage beteween 30-100
@@ -263,6 +263,7 @@ void setup() {
         dashboard.sendUpdates();
     });
     start_stop.update(1); // initial state is machine running, without any user input
+    dashboard.sendUpdates();
 
     motor_speed_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
@@ -271,7 +272,8 @@ void setup() {
         dashboard.sendUpdates();
     });
     motor_speed_target.update(100); //default speed
-    
+    dashboard.sendUpdates();
+
     actuations_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
         //value = value/1000*1000; // round to nearest 1000 disabled for displaytesting only
@@ -298,7 +300,7 @@ void setup() {
                 u_timer_target_str = std::to_string(u_timer_target_h) + ":" + std::to_string(u_timer_target_m);
             }
             timer_target.update(String(u_timer_target_str.c_str()));
-            u_timer_target = (u_timer_target_h*3600 + u_timer_target_m*60)*1000; // in millis
+            u_timer_target = (u_timer_target_h*3600 + u_timer_target_m*60)*1; // in seconds
         }
         else{
             timer_target.update("Check Input Format HH:MM");
@@ -440,16 +442,20 @@ void loop() {
             state=3;
             timer_start=millis();
             u_actuations_target=0;
-            u_progress=0; //Reset progress upon entering state
+            //u_progress=0; //Reset progress upon entering state
         }
         break;
     
     case 3: // Timer Active
         run_enable=1;
-        Run_time = millis() - timer_start;
-        u_progress = (float)Run_time / (float)u_timer_target*100.0;
+        //Run_time = millis() - timer_start;
+        //u_progress = (float)Run_time / (float)u_timer_target*100.0;
+        u_progress = (float)now() / (float)u_timer_target*100.0;
+        if (u_progress>100.0){
+            u_progress = 100;
+        }
         
-        if (!u_request || Run_time>=u_timer_target){
+        if (!u_request || now()>=u_timer_target){
             state=0;
             run_enable=0;
             u_request=0;
@@ -460,15 +466,16 @@ void loop() {
         {
             state=2;
             u_timer_target=0;
-            u_progress=0; //Reset progress upon entering state
+            //u_progress=0; //Reset progress upon entering state
         }
         break;
     }
     Serial.println("debug");
     Serial.println(state);
     Serial.println(run_enable);
-    Serial.println(Run_time);
+    //Serial.println(Run_time);
     Serial.println(u_timer_target);
+    Serial.println(now()); // returns the current time as seconds since Jan 1 1970
 
     //Motor Command
     //Serial.println(pwm_command*run_enable);
