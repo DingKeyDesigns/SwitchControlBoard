@@ -20,6 +20,10 @@
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncTCP.h>
 #include <ESPDashPro.h>
+//TODO estimate time remaining
+//TODO greater than 24h limit
+//TODO map run_enable to state just prior to command
+//TODO status card for which limit hit counter or timer
 
 /* Unused variables
 // SCL GPIO5
