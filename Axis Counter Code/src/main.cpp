@@ -133,8 +133,9 @@ Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000
 Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes, HH:MM)");
 
 Tab totals_tab(&dashboard, "Totals");
-Card Run_total(&dashboard, GENERIC_CARD, "Total Run Time");
 Card Cycles_total(&dashboard, GENERIC_CARD, "Total Actuation Cycles");
+Card Run_total(&dashboard, GENERIC_CARD, "Total Run Time");
+Card Reset_total(&dashboard, BUTTON_CARD, "Reset All Totals");
 
 IRAM_ATTR void doMotorEncoder() {
   unsigned char mresult = r.process();
@@ -252,11 +253,10 @@ void setup() {
     Serial.println(myIP);
     //server.on("/", handleRoot);
     server.begin();
-
-    start_stop.update(run_enable); // initial state is machine running, without any user input
-    motor_speed_target.update(u_speed_target); //default speed
     
+    //Dashboard Setup
     dashboard.setTitle("DingKey Designs");
+
     start_stop.attachCallback([&](int value){
         /* Print our new button value received from dashboard */
         //Serial.println("Button Triggered: "+String((value)?"true":"false"));
@@ -265,12 +265,16 @@ void setup() {
         start_stop.update(value);
         dashboard.sendUpdates();
     });
+    start_stop.update(1); // initial state is machine running, without any user input
+
     motor_speed_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
         u_speed_target = value;
         motor_speed_target.update(value);
         dashboard.sendUpdates();
     });
+    motor_speed_target.update(100); //default speed
+    
     actuations_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
         //value = value/1000*1000; // round to nearest 1000 disabled for displaytesting only
@@ -307,6 +311,7 @@ void setup() {
 
     Run_total.setTab(&totals_tab);
     Cycles_total.setTab(&totals_tab);
+    Reset_total.setTab(&totals_tab);
 
     // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 64x48)
