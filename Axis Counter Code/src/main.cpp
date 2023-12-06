@@ -96,7 +96,7 @@ volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
 //unsigned long Run_time = 0;
 unsigned long Run_time_total = 0;  // not resettable unless powered down
 char Run_time_total_str[15];
-unsigned long timer_start = 0;
+//unsigned long timer_start = 0;
 
 //TODO eeprom non-volatile memeory for cycle time count
 
@@ -306,6 +306,7 @@ void setup() {
             timer_target.update("Check Input Format HH:MM");
         }
         dashboard.sendUpdates();
+        dashboard.sendUpdates(); // TODO investigate why unchanging on first try
     });
     
     Reset_total.attachCallback([&](int value){
@@ -402,35 +403,38 @@ void loop() {
     switch (state)
     {
     case 0: // Idle
-        run_enable=0;
+        
         if (u_request){
             state=1;
         }
+
+        run_enable=0;
         break;
     
     case 1: // Machine Run
-        run_enable=1;
+        
         if (u_actuations_target>0){
             state=2;
             //Cycles_done=0;
             //u_progress=0; //Reset progress upon entering state
         }
-        else if (u_actuations_target>0){
+        else if (u_timer_target>0){
             state=3;
-            timer_start=millis();
-            u_progress=0; //Reset progress upon entering state
+            //timer_start=millis();
+            //u_progress=0; //Reset progress upon entering state
         }
         if (!u_request){
             state=0;
         }
+
+        run_enable=1;
         break;
     
     case 2: // Counter active
-        run_enable=1;
+        
         u_progress = (float)Cycles_done / (float)u_actuations_target*100.0;
-        if (u_progress>100.0){
-            u_progress = 100;
-        }
+        if (u_progress>=100.0){u_progress = 100;}
+        
         if (!u_request || Cycles_done>=u_actuations_target){
             state=0;
             run_enable=0;
@@ -439,21 +443,21 @@ void loop() {
             dashboard.sendUpdates();
         }
         else if (u_timer_target>0){
-            state=3;
-            timer_start=millis();
-            u_actuations_target=0;
+            state=4;
+            //timer_start=millis();
+            //u_actuations_target=0;
             //u_progress=0; //Reset progress upon entering state
         }
+
+        run_enable=1;
         break;
     
     case 3: // Timer Active
-        run_enable=1;
+        
         //Run_time = millis() - timer_start;
         //u_progress = (float)Run_time / (float)u_timer_target*100.0;
         u_progress = (float)now() / (float)u_timer_target*100.0;
-        if (u_progress>100.0){
-            u_progress = 100;
-        }
+        if (u_progress>=100.0){u_progress = 100;}
         
         if (!u_request || now()>=u_timer_target){
             state=0;
@@ -464,11 +468,35 @@ void loop() {
         }
         else if (u_actuations_target>0)
         {
-            state=2;
-            u_timer_target=0;
+            state=4;
+            //u_timer_target=0;
             //u_progress=0; //Reset progress upon entering state
         }
+
+        run_enable=1;
         break;
+
+    case 4: //Counter and Timer Active
+        
+        u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), ((float)now()/(float)u_timer_target*100.0) );
+        if (u_progress>=100.0){u_progress = 100;}
+
+        if (!u_request || u_progress>=100.0){
+            state=0;
+            run_enable=0;
+            u_request=0;
+            start_stop.update(u_request); //dashboard update
+            dashboard.sendUpdates();
+        }
+        if (u_timer_target <= 0){
+            state = 2; //counter only
+        }
+        if (u_actuations_target <= 0){
+            state = 3; //timer only
+        }
+
+        run_enable = 1;
+
     }
     Serial.println("debug");
     Serial.println(state);
