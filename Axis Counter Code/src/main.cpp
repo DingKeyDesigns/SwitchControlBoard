@@ -1,6 +1,6 @@
 // DingKey Designs Control Board
 // V0.0.1
-// 11/26/2023
+// 12/10/2023
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -132,7 +132,10 @@ Card motor_speed_target(&dashboard, SLIDER_CARD, "Motor Speed", "%", 30, 100);
 
 Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "%", 0, 100);
 //Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000000);
-Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000); //displaytesting only
+//Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000); //displaytesting only
+Card actuations_target_display(&dashboard, GENERIC_CARD, "Target Actuations Set");
+Card actuations_input(&dashboard, TEXT_INPUT_CARD, "Target Actuations");
+Card timer_target_display(&dashboard, GENERIC_CARD, "Timer Set (HH:MM)");
 Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes, HH:MM)");
 
 Tab totals_tab(&dashboard, "Totals");
@@ -265,8 +268,7 @@ void setup() {
         start_stop.update(value);
         dashboard.sendUpdates();
     });
-    start_stop.update(1); // initial state is machine running, without any user input
-    dashboard.sendUpdates();
+    
 
     motor_speed_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
@@ -277,6 +279,7 @@ void setup() {
     motor_speed_target.update(100); //default speed
     dashboard.sendUpdates();
 
+    /*
     actuations_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
         //value = value/1000*1000; // round to nearest 1000 disabled for displaytesting only
@@ -284,6 +287,29 @@ void setup() {
         actuations_target.update(value);
         dashboard.sendUpdates();
     });
+    */
+    
+    // Cycles input needs to be whole number
+    actuations_input.attachCallback([&](const char* value){
+        std::string u_actuations_target_str = value;
+        std::regex time_expr("^\\d+$");
+        std::smatch base_match;
+        if (std::regex_match(u_actuations_target_str, base_match, time_expr)){
+            u_actuations_target = std::stoul(u_actuations_target_str);
+            if (u_actuations_target > 1e9){  //actuations limit
+                u_actuations_target = 1e9;
+            }
+            u_actuations_target_str = std::to_string(u_actuations_target);
+            actuations_input.update(u_actuations_target_str.c_str());
+            actuations_target_display.update(u_actuations_target_str.c_str());
+        }
+        else{
+            actuations_input.update("Check Input, Whole Numbers Only");
+        }
+        dashboard.sendUpdates();
+        dashboard.sendUpdates(); // TODO investigate why unchanging on first try
+    });
+    
     // Timer input needs to be in HH:MM format
     timer_target.attachCallback([&](const char* value){
 
@@ -302,7 +328,8 @@ void setup() {
             else{
                 u_timer_target_str = std::to_string(u_timer_target_h) + ":" + std::to_string(u_timer_target_m);
             }
-            timer_target.update(String(u_timer_target_str.c_str()));
+            timer_target.update(u_timer_target_str.c_str());
+            timer_target_display.update(u_timer_target_str.c_str());
             u_timer_target = (u_timer_target_h*3600 + u_timer_target_m*60)*1; // in seconds
         }
         else{
@@ -350,6 +377,9 @@ void setup() {
     display.setCursor(0,0);
     
     cps_mov_avg.begin();
+
+    start_stop.update(1); // initial state is machine running, without any user input
+    dashboard.sendUpdates();
 }
 
 void loop() {
@@ -497,14 +527,15 @@ void loop() {
     //Serial.println(Run_time);
     Serial.println(u_timer_target);
     Serial.println(now()); // returns the current time as seconds since Jan 1 1970
+    Serial.println(pwm_command);
 
     //Motor Command
     //Serial.println(pwm_command*run_enable);
     analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
     //Simulated Cycles
-    if (run_enable){
-        Cycles_done += 1; //displaytesting only, simulated cycles
-    }
+    //if (run_enable){
+    //    Cycles_done += 1; //displaytesting only, simulated cycles
+    //}
 
     dash_millis_delta =  millis()-dash_millis;
     if (dash_millis_delta>= dash_interval) {
