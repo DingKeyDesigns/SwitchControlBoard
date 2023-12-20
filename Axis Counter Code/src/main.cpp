@@ -97,7 +97,6 @@ unsigned long Encoder_delta = 0;
 unsigned long micros_delta = 0;
 float cps = 0; // cycles per second
 float cps_avg = 0; // cycles per second, filtered
-movingAvgFloat cps_mov_avg(50);
 float rpm = 0; // calculated from smoothed cps_avg
 char rpm_str[6];
 float cph = 0; // calculated from additional smoothed cps_avg, cycles per hour
@@ -108,6 +107,8 @@ volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
 unsigned long Run_time_total = 0;  // not resettable unless powered down
 char Run_time_total_str[15];
 //unsigned long timer_start = 0;
+unsigned long encoder_interval = 5000; //micros, rpm calcuation interval
+movingAvgFloat cps_mov_avg(100); // cycles per second average window based on encoder_interval in micros, if 5000micros interval 20 readings per second
 //TODO eeprom non-volatile memeory for cycle time count
 
 //Motor Control
@@ -381,15 +382,16 @@ void setup() {
     cps_mov_avg.begin();
 
     //Splash Screen 2
-    delay(4000);
+    delay(2000);
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(WHITE);
     display.setCursor(0,0);
-    display.println("Cycles");
-    display.println("RPM");
-    display.println("Cycles/hr");
-    display.println("Runtime");
+    display.println(">Cycles");
+    display.println(">RPM");
+    display.println(">Cycles/hr");
+    display.println(">Run Time");
+    display.println(">IP:");
     display.println(myIP);
     display.display();
     delay(6000);
@@ -407,16 +409,17 @@ void loop() {
     //server.handleClient();
     
     total_micros = micros();
-    Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
-
-    cps = float(Encoder_delta) / float(STEPS_ROTATION) / (float(micros_delta)/1.00E6); //cycles per second
-    cps_avg = cps_mov_avg.reading(cps); // moving average filter
-    cph = cps_avg * 3600.0; // cycles per second *60 *60 = cycles per hour
-    rpm = cps_avg * 60.0 / 2.0; // cycles per second * 60 / 2 cycles per rotation
-    
-    lastEncoderPos = totalEncoderPos;
-    last_micros = total_micros;
+    if (micros_delta > encoder_interval){
+        Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
+        cps = float(Encoder_delta) / float(STEPS_ROTATION) / (float(micros_delta)/1.00E6); //cycles per second
+        cps_avg = cps_mov_avg.reading(cps); // moving average filter
+        cph = cps_avg * 3600.0; // cycles per second *60 *60 = cycles per hour
+        rpm = cps_avg * 60.0 / 2.0; // cycles per second * 60 / 2 cycles per rotation
+        
+        lastEncoderPos = totalEncoderPos;
+        last_micros = total_micros;
+    }
 
     if (millis()-disp_millis >= disp_interval) { //throttled for performance
         disp_millis = millis();
