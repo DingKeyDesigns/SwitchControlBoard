@@ -48,8 +48,6 @@ volatile unsigned long requestedCycles = 0;
 //Screen Setup
 #define OLED_RESET 0  // GPIO0
 Adafruit_SSD1306 display(OLED_RESET);
-const int disp_interval = 100;//display update interval millis
-unsigned long disp_millis = 0;
 #define LOGO16_GLCD_HEIGHT 16
 #define LOGO16_GLCD_WIDTH  16
 
@@ -78,13 +76,8 @@ void notFound(AsyncWebServerRequest *request) {
 //Rotary Encoder
 #define ROTARY_PIN1	D6
 #define ROTARY_PIN2	D5
-//Motor Configruation, 11 pulses per rotation, divide by 2 two actuations per rotation
-//170rpm:  Gear ratio 176rpm 1:34
-//280rpm:  Gear Ratio 281rpm 1:21.3
-#define MOTOR_CONFIG "170rpm"
-#define STEPS_ROTATION 187.00
-//#define MOTOR_CONFIG "280rpm"
-//#define STEPS_ROTATION 117.15 //281rpm 11 pulses per rotation, Gear ratio 176rpm 1:34, Gear Ratio 281rpm 1:21.3, divide by 2 two actuations per rotation
+//#define STEPS_ROTATION 187.00 //170rpm  11 pulses per rotation, Gear ratio 176rpm 1:34, Gear Ratio 281rpm 1:21.3, divide by 2 two actuations per rotation
+#define STEPS_ROTATION 117.15 //281rpm 11 pulses per rotation, Gear ratio 176rpm 1:34, Gear Ratio 281rpm 1:21.3, divide by 2 two actuations per rotation
 Rotary r = Rotary(ROTARY_PIN1, ROTARY_PIN2);
 #define DIR_CW 0x10
 #define DIR_CCW 0x20
@@ -230,19 +223,6 @@ void setup() {
     pinMode(ledPin, OUTPUT);
     digitalWrite(ledPin, LOW); // LOW turns LED on
 
-    //Splash Screen 1
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 64x48)
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(WHITE);
-    display.setCursor(0,0);
-    display.println("DingKey");
-    display.println("Designs");
-    display.println("");
-    display.println(MOTOR_CONFIG);
-    display.println("v0.0.1");
-    display.display();
-
     //Wifi Access Point
     int id_suffix = 1;
     Serial.print("Configuring access point...");
@@ -279,8 +259,7 @@ void setup() {
     Serial.println(myIP);
     //server.on("/", handleRoot);
     server.begin();
-    display.println(myIP);
-    display.display();
+    
     //Dashboard Setup
     dashboard.setTitle("DingKey Designs");
 
@@ -375,24 +354,19 @@ void setup() {
     Cycles_total.setTab(&totals_tab);
     Reset_total.setTab(&totals_tab);
 
-    start_stop.update((int) 1); // initial state is machine running, without any user input
-    dashboard.sendUpdates();
-
-    cps_mov_avg.begin();
-
-    //Splash Screen 2
-    delay(4000);
+    // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 64x48)
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(WHITE);
     display.setCursor(0,0);
-    display.println("Cycles");
-    display.println("RPM");
-    display.println("Cycles/hr");
-    display.println("Runtime");
+    display.println("DingKey");
+    display.println("Designs");
+    display.println("------");
+    display.println("v0.0.1");
     display.println(myIP);
     display.display();
-    delay(6000);
+    delay(2000);
 
     // Clear the buffer.
     display.clearDisplay();
@@ -401,6 +375,11 @@ void setup() {
     display.setTextSize(1);
     display.setTextColor(WHITE);
     display.setCursor(0,0);
+    
+    cps_mov_avg.begin();
+
+    start_stop.update(1); // initial state is machine running, without any user input
+    dashboard.sendUpdates();
 }
 
 void loop() {
@@ -418,33 +397,31 @@ void loop() {
     lastEncoderPos = totalEncoderPos;
     last_micros = total_micros;
 
-    if (millis()-disp_millis >= disp_interval) { //throttled for performance
-        disp_millis = millis();
-        display.clearDisplay();
-        // display.setTextSize(1);
-        // display.setTextColor(WHITE);
-        display.setCursor(0,0);
-        display.print("C:");
-        display.println(displayLargeNum(Cycles_done));
-        
-        display.print("RPM:");
-        snprintf(rpm_str,6,"%.1f",rpm);
-        display.println(rpm_str);
-        
-        display.print("Hr:");
-        snprintf(cph_str,10,"%.0f",cph);
-        display.println(cph_str);
-        
-        time_string(); //update display time string
-        display.println(Run_time_total_str);
-
-        //display.print("IP:");
-        display.println(myIP);
-        
-        display.display();
-        //r.loop();
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0,0);
     
-    };
+    display.println(displayLargeNum(Cycles_done));
+
+    display.print("RPM:");
+    snprintf(rpm_str,6,"%.1f",rpm);
+    display.println(rpm_str);
+    snprintf(cph_str,10,"%.0f",cph);
+    display.println(cph_str);
+    //Serial.println(rpm);
+    //Serial.println(total_micros);
+    
+
+    time_string(); //update display time string
+    display.println(Run_time_total_str);
+
+    display.println(myIP);
+    display.display();
+
+    display.clearDisplay();
+    //analogWrite(D7, pwm);
+    //r.loop();
+    
     // Motor Control
     // Speed targets between 30% and 100%
     if (u_speed_target < u_speed_target_lim1){
@@ -544,21 +521,20 @@ void loop() {
         run_enable = 1;
         break;
     }
-    // Serial.println("debug");
-    // Serial.println(state);
-    // Serial.println(run_enable);
-    // Serial.println(Run_time);
-    // Serial.println(u_timer_target);
-    // Serial.println(now()); // returns the current time as seconds since Jan 1 1970
-    // Serial.println(pwm_command);
+    Serial.println("debug");
+    Serial.println(state);
+    Serial.println(run_enable);
+    //Serial.println(Run_time);
+    Serial.println(u_timer_target);
+    Serial.println(now()); // returns the current time as seconds since Jan 1 1970
+    Serial.println(pwm_command);
 
     //Motor Command
-    analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
     //Serial.println(pwm_command*run_enable);
-
+    analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
     //Simulated Cycles
     //if (run_enable){
-    //   Cycles_done += 10; //displaytesting only, simulated cycles
+    //    Cycles_done += 1; //displaytesting only, simulated cycles
     //}
 
     dash_millis_delta =  millis()-dash_millis;
