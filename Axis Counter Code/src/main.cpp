@@ -412,7 +412,7 @@ void loop() {
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
     if (micros_delta > encoder_interval){
         Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
-        cps = float(Encoder_delta) / float(STEPS_ROTATION) / (float(micros_delta)/1.00E6); //cycles per second
+        cps = abs(float(Encoder_delta) / float(STEPS_ROTATION) / (float(micros_delta)/1.00E6)); //cycles per second
         cps_avg = cps_mov_avg.reading(cps); // moving average filter
         cph = cps_avg * 3600.0; // cycles per second *60 *60 = cycles per hour
         rpm = cps_avg * 60.0 / 2.0; // cycles per second * 60 / 2 cycles per rotation
