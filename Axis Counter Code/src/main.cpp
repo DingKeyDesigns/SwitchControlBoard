@@ -432,11 +432,11 @@ void loop() {
         display.println(displayLargeNum(Cycles_done));
         
         display.print("RPM:");
-        snprintf(rpm_str,6,"%.1f",rpm);
+        snprintf(rpm_str,6,"%.1f",abs(rpm));
         display.println(rpm_str);
         
         display.print("Hr:");
-        snprintf(cph_str,10,"%.0f",cph);
+        snprintf(cph_str,10,"%.0f",abs(cph));
         display.println(cph_str);
         
         time_string(); //update display time string
