@@ -94,9 +94,9 @@ movingAvgFloat cps_mov_avg(100); // cycles per second average window based on en
 int pwm_command = 0;
 
 //State Machine
-int state=0;
+int state=1;
 bool run_enable = 1; //start in running status TODO this feature is not working to initialize machine as enabled
-int u_request = 0;
+int u_request = 1;
 int u_speed_target = 100; //percentage beteween 30-100
 const int u_speed_target_lim1 = 30;
 const int u_speed_target_lim2 = 100;
