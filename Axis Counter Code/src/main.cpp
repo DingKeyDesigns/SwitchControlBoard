@@ -175,19 +175,12 @@ void counterSetup() {
 }
 
 void time_string(){
-    if (day()-1>0 && minute()<10){
-        snprintf(Run_time_total_str,15, "%ud %u:0%u:%u", day()-1, hour(), minute(), second());
-    }
-    else if (day()-1>0){
-        snprintf(Run_time_total_str,15, "%ud %u:%u:%u", day()-1, hour(), minute(), second());
-    }
-    else if (hour()>0 && minute()<10)
-    {
-        snprintf(Run_time_total_str,15, "%u:0%u:%u", hour(), minute(), second()); //padded zero
+    if (day()-1>0){
+        snprintf(Run_time_total_str,15, "%ud %u:%02u:%02u", day()-1, hour(), minute(), second());
     }
     else if (hour()>0)
     {
-        snprintf(Run_time_total_str,15, "%u:%u:%u", hour(), minute(), second());
+        snprintf(Run_time_total_str,15, "%u:%02u:%02u", hour(), minute(), second());
     }
     else{
         snprintf(Run_time_total_str,15, "%um %us", minute(), second());
@@ -399,7 +392,7 @@ void setup() {
     display.println(">IP:");
     display.println(myIP);
     display.display();
-    delay(6000);
+    delay(5000);
 
     // Clear the buffer.
     display.clearDisplay();
@@ -435,7 +428,7 @@ void loop() {
         // display.setTextSize(1);
         // display.setTextColor(WHITE);
         display.setCursor(0,0);
-        display.print("C:");
+        //display.print("C:");
         display.println(displayLargeNum(Cycles_done));
         
         display.print("RPM:");
