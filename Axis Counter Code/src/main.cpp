@@ -379,8 +379,6 @@ void setup() {
     start_stop.update((int) 1); // initial state is machine running, without any user input
     dashboard.sendUpdates();
 
-    cps_mov_avg.begin();
-
     //Splash Screen 2
     delay(2000);
     display.clearDisplay();
@@ -399,10 +397,13 @@ void setup() {
     // Clear the buffer.
     display.clearDisplay();
     display.display();
-    counterSetup();
     display.setTextSize(1);
     display.setTextColor(WHITE);
     display.setCursor(0,0);
+
+    counterSetup();
+    cps_mov_avg.begin();
+    setTime(0); //reset clock for display
 }
 
 void loop() {
