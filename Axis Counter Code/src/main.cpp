@@ -353,7 +353,7 @@ void setup() {
     Cycles_total.setTab(&totals_tab);
     Reset_total.setTab(&totals_tab);
 
-    start_stop.update((int) 1); // initial state is machine running, without any user input
+    start_stop.update((int) u_request); // initial state is machine running, without any user input
     dashboard.sendUpdates();
 
     //Splash Screen 2
