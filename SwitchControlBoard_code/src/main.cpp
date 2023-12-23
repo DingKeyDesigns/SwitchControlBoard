@@ -313,7 +313,8 @@ void setup() {
     timer_target.attachCallback([&](const char* value){
 
         std::string u_timer_target_str = value;
-        std::regex time_expr("^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$");
+        //std::regex time_expr("^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"); // up to 23 hours, 59 minutes
+        std::regex time_expr("^([0-9]|[1-9][0-9]|[1-4][0-9]{2}|500):[0-5][0-9]$"); // up to 500 hours, 59 minutes
         std::smatch base_match;
         if (std::regex_match(u_timer_target_str, base_match, time_expr)){
             std::string::size_type pos = u_timer_target_str.find(":");
