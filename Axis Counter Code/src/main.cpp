@@ -25,26 +25,6 @@
 //TODO map run_enable to state just prior to command
 //TODO status card for which limit hit counter or timer
 
-/* Unused variables
-// SCL GPIO5
-// SDA GPIO4
-#define NUMFLAKES 10
-#define XPOS 0
-#define YPOS 1
-#define DELTAY 2
-unsigned long Old_Cycles_done = 0;
-unsigned long last_millis = 0;
-byte percent = 0;
-byte pwm = 255;
-const char* PARAM_INPUT_1 = "pwm";
-const char* PARAM_INPUT_2 = "cycles";
-const char* PARAM_INPUT_3 = "input3";
-String inputMessageFinal = "testMessage";
-int requestFlag = 0;
-volatile unsigned long requestedCycles = 0;
-#define CLICKS_PER_STEP 1s
-*/
-
 //Screen Setup
 #define OLED_RESET 0  // GPIO0
 Adafruit_SSD1306 display(OLED_RESET);
@@ -69,25 +49,24 @@ IPAddress local_IP(10,10,10,1);
 IPAddress gateway(10,10,1,1);
 IPAddress subnet(255,255,255,0);
 AsyncWebServer server(80); //ESP8266WebServer
-/*
-void notFound(AsyncWebServerRequest *request) {
-  request->send(404, "text/plain", "Not found");
-}
-*/
 
 //Rotary Encoder
 #define ROTARY_PIN1	D6
 #define ROTARY_PIN2	D5
-//Motor Configruation, 11 pulses per rotation, divide by 2 two actuations per rotation
-//170rpm:  Gear ratio 176rpm 1:34
-//280rpm:  Gear Ratio 281rpm 1:21.3
-#define MOTOR_CONFIG "170rpm"
-#define STEPS_ROTATION 187.00
-//#define MOTOR_CONFIG "280rpm"
-//#define STEPS_ROTATION 117.15 //281rpm 11 pulses per rotation, Gear ratio 176rpm 1:34, Gear Ratio 281rpm 1:21.3, divide by 2 two actuations per rotation
-Rotary r = Rotary(ROTARY_PIN1, ROTARY_PIN2);
 #define DIR_CW 0x10
 #define DIR_CCW 0x20
+Rotary r = Rotary(ROTARY_PIN1, ROTARY_PIN2);
+
+//Motor Configruation 1, 11 pulses per rotation, divide by 2 two actuations per rotation
+//170rpm:  Gear ratio 176rpm 1:34
+#define MOTOR_CONFIG "170rpm"
+#define STEPS_ROTATION 187.00
+
+//Motor Configruation 2, 11 pulses per rotation, divide by 2 two actuations per rotation
+//280rpm:  Gear Ratio 281rpm 1:21.3
+//#define MOTOR_CONFIG "280rpm"
+//#define STEPS_ROTATION 117.15 //281rpm 11 pulses per rotation, Gear ratio 176rpm 1:34, Gear Ratio 281rpm 1:21.3, divide by 2 two actuations per rotation
+
 volatile unsigned long MotorEncoderPos = 0;
 volatile unsigned long totalEncoderPos = 0;
 volatile unsigned long total_micros = 1;
@@ -98,17 +77,16 @@ unsigned long micros_delta = 0;
 float cps = 0; // cycles per second
 float cps_avg = 0; // cycles per second, filtered
 float rpm = 0; // calculated from smoothed cps_avg
-char rpm_str[6];
 float cph = 0; // calculated from additional smoothed cps_avg, cycles per hour
+char rpm_str[6];
 char cph_str[10];
 volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
-//volatile double Cycles_done_total = 0; // not resettable unless powered down or reset buton on totals page TODO
-//unsigned long Run_time = 0;
-unsigned long Run_time_total = 0;  // not resettable unless powered down
+unsigned long Run_time_total = 0;
 char Run_time_total_str[15];
-//unsigned long timer_start = 0;
+
 unsigned long encoder_interval = 5000; //micros, rpm calcuation interval
 movingAvgFloat cps_mov_avg(100); // cycles per second average window based on encoder_interval in micros, if 5000micros interval 20 readings per second
+
 //TODO eeprom non-volatile memeory for cycle time count
 
 //Motor Control
@@ -117,8 +95,7 @@ int pwm_command = 0;
 
 //State Machine
 int state=0;
-bool run_enable = 1; //start in running status TODO this feature is not working
-
+bool run_enable = 1; //start in running status TODO this feature is not working to initialize machine as enabled
 int u_request = 0;
 int u_speed_target = 100; //percentage beteween 30-100
 const int u_speed_target_lim1 = 30;
@@ -198,7 +175,7 @@ String displayLargeNum(double num){
     }
     else if (num<100)
     {
-        num = 2;
+        display_prec = 2;
     }
     else if (num<1000)
     {
@@ -220,7 +197,7 @@ String displayLargeNum(double num){
     {
         display_prec = 7;
     }
-    std::string num_str = to_engineering_string(Cycles_done,display_prec, eng_prefixed);
+    std::string num_str = to_engineering_string(Cycles_done,display_prec,eng_prefixed);
     
     return String(num_str.c_str());
 }
@@ -428,6 +405,7 @@ void loop() {
         // display.setTextSize(1);
         // display.setTextColor(WHITE);
         display.setCursor(0,0);
+        
         //display.print("C:");
         display.println(displayLargeNum(Cycles_done));
         
@@ -442,12 +420,10 @@ void loop() {
         time_string(); //update display time string
         display.println(Run_time_total_str);
 
-        //display.print("IP:");
         display.println(myIP);
-        
+
         display.display();
-        //r.loop();
-    
+
     };
     // Motor Control
     // Speed targets between 30% and 100%
@@ -463,11 +439,9 @@ void loop() {
     switch (state)
     {
     case 0: // Idle
-        
         if (u_request){
             state=1;
         }
-
         run_enable=0;
         break;
     
@@ -529,7 +503,6 @@ void loop() {
         break;
 
     case 4: //Counter and Timer Active
-        
         u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), ((float)now()/(float)u_timer_target*100.0) );
         if (u_progress>=100.0){u_progress = 100;}
         if (!u_request || u_progress>=100.0){
@@ -548,6 +521,8 @@ void loop() {
         run_enable = 1;
         break;
     }
+    
+    // Debug commands
     // Serial.println("debug");
     // Serial.println(state);
     // Serial.println(run_enable);
@@ -555,15 +530,15 @@ void loop() {
     // Serial.println(u_timer_target);
     // Serial.println(now()); // returns the current time as seconds since Jan 1 1970
     // Serial.println(pwm_command);
-
-    //Motor Command
-    analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
     //Serial.println(pwm_command*run_enable);
 
     //Simulated Cycles
     //if (run_enable){
     //   Cycles_done += 10; //displaytesting only, simulated cycles
     //}
+
+    //Motor Command
+    analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
 
     dash_millis_delta =  millis()-dash_millis;
     if (dash_millis_delta>= dash_interval) {
