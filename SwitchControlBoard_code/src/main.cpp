@@ -1,6 +1,6 @@
 // DingKey Designs Control Board
-// V0.0.1
 // 12/23/2023
+#define SW_VERSION "v1.0.0"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -133,10 +133,9 @@ IRAM_ATTR void doMotorEncoder() {
   if (mresult == DIR_CW || mresult == DIR_CCW) {
     MotorEncoderPos++;
     totalEncoderPos++;
-    //total_micros = micros(); // record time of measurement
+    
     if (MotorEncoderPos >= STEPS_ROTATION) {  // 374=11 pulses per rev X 34 (gear ratio of the motor)
       Cycles_done += 1; // I incremented in twos but you can reduce it to 1 if pulses/rev is even number like 374 is. For increments of 1, replace 374 with 187
-      //Cycles_done_total += 1;
       MotorEncoderPos = 0;
     }
   }
@@ -218,7 +217,7 @@ void setup() {
     display.println("Designs");
     display.println("");
     display.println(MOTOR_CONFIG);
-    display.println("v0.0.1");
+    display.println(SW_VERSION);
     display.display();
 
     //Wifi Access Point
