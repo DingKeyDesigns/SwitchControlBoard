@@ -1,6 +1,6 @@
 // DingKey Designs Control Board
 // 12/23/2023
-#define SW_VERSION "v1.0.0"
+#define SW_VERSION "v1.0.1beta"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -103,6 +103,14 @@ const int u_speed_target_lim2 = 100;
 float u_progress = 0; //percentage completion between 0-100%
 unsigned long u_actuations_target = 0; //requested number of cycles
 unsigned long u_timer_target = 0; //requested timer
+unsigned long lastSecond = 0;
+
+// Timer variables
+unsigned long timer_last = 0;
+uint8 t_seconds = 0;
+uint8 t_minutes = 0;
+uint8 t_hours = 0;
+uint16 t_days = 0;
 
 // Dashboard Interface
 ESPDash dashboard(&server); //Attach ESP-DASH to AsyncWebServer
@@ -150,18 +158,56 @@ void counterSetup() {
     total_micros = micros(); //prevents divide by zero
 }
 
+void timer(){
+    if(millis()-timer_last >= 1000)
+    {
+        timer_last += 1000;
+        t_seconds++;
+    }
+    if(t_seconds > 59)
+    {
+        t_seconds = 0;
+        t_minutes++;
+    }
+    if(t_minutes > 59)
+    {
+        t_minutes = 0;
+        t_hours++;
+    }
+    if(t_hours > 23)
+    {
+        t_hours = 0;
+        t_days++;
+    }
+}
+
+// Using timer()
 void time_string(){
-    if (day()-1>0){
-        snprintf(Run_time_total_str,15, "%ud\n%u:%02u:%02u", day()-1, hour(), minute(), second());
+    if (t_days>0){
+        snprintf(Run_time_total_str,15, "%ud\n%u:%02u:%02u", t_days, t_hours, t_minutes, t_seconds);
     }
     else if (hour()>0)
     {
-        snprintf(Run_time_total_str,15, "%u:%02u:%02u", hour(), minute(), second());
+        snprintf(Run_time_total_str,15, "%u:%02u:%02u", t_hours, t_minutes, t_seconds);
     }
     else{
-        snprintf(Run_time_total_str,15, "%um %us", minute(), second());
+        snprintf(Run_time_total_str,15, "%um %us", t_minutes, t_seconds);
     }
 }
+
+// Using TimeLib.h
+// void time_string(){
+//     if (day()-1>0){
+//         snprintf(Run_time_total_str,15, "%ud\n%u:%02u:%02u", day()-1, hour(), minute(), second());
+//     }
+//     else if (hour()>0)
+//     {
+//         snprintf(Run_time_total_str,15, "%u:%02u:%02u", hour(), minute(), second());
+//     }
+//     else{
+//         snprintf(Run_time_total_str,15, "%um %us", minute(), second());
+//     }
+// }
 
 String displayLargeNum(double num){
      // Format number for user display
