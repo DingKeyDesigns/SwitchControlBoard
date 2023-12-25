@@ -152,7 +152,7 @@ void counterSetup() {
 
 void time_string(){
     if (day()-1>0){
-        snprintf(Run_time_total_str,15, "%ud %u:%02u:%02u", day()-1, hour(), minute(), second());
+        snprintf(Run_time_total_str,15, "%ud\n%u:%02u:%02u", day()-1, hour(), minute(), second());
     }
     else if (hour()>0)
     {
