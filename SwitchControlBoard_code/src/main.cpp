@@ -182,32 +182,32 @@ void timer(){
 }
 
 // Using timer()
-void time_string(){
-    if (t_days>0){
-        snprintf(Run_time_total_str,15, "%ud\n%u:%02u:%02u", t_days, t_hours, t_minutes, t_seconds);
-    }
-    else if (hour()>0)
-    {
-        snprintf(Run_time_total_str,15, "%u:%02u:%02u", t_hours, t_minutes, t_seconds);
-    }
-    else{
-        snprintf(Run_time_total_str,15, "%um %us", t_minutes, t_seconds);
-    }
-}
-
-// Using TimeLib.h
 // void time_string(){
-//     if (day()-1>0){
-//         snprintf(Run_time_total_str,15, "%ud\n%u:%02u:%02u", day()-1, hour(), minute(), second());
+//     if (t_days>0){
+//         snprintf(Run_time_total_str,15, "%ud\n%u:%02u:%02u", t_days, t_hours, t_minutes, t_seconds);
 //     }
 //     else if (hour()>0)
 //     {
-//         snprintf(Run_time_total_str,15, "%u:%02u:%02u", hour(), minute(), second());
+//         snprintf(Run_time_total_str,15, "%u:%02u:%02u", t_hours, t_minutes, t_seconds);
 //     }
 //     else{
-//         snprintf(Run_time_total_str,15, "%um %us", minute(), second());
+//         snprintf(Run_time_total_str,15, "%um %us", t_minutes, t_seconds);
 //     }
 // }
+
+// Using TimeLib.h
+void time_string(){
+    if (day()-1>0){
+        snprintf(Run_time_total_str,15, "%ud\n%u:%02u:%02u", day()-1, hour(), minute(), second());
+    }
+    else if (hour()>0)
+    {
+        snprintf(Run_time_total_str,15, "%u:%02u:%02u", hour(), minute(), second());
+    }
+    else{
+        snprintf(Run_time_total_str,15, "%um %us", minute(), second());
+    }
+}
 
 String displayLargeNum(double num){
      // Format number for user display
