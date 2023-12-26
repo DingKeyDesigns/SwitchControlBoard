@@ -107,7 +107,7 @@ unsigned long lastSecond = 0;
 
 // Timer variables
 unsigned long timer_last = 0;
-float t_now = 0; //total seconds since started
+float t_now = 0.0; //total seconds since started
 uint8 t_seconds = 0;
 uint8 t_minutes = 0;
 uint8 t_hours = 0;
@@ -393,7 +393,16 @@ void setup() {
         run_enable=0;
         u_request=0;
         Cycles_done = 0; //reset number of cycles
+        
+        // Reset timer
         //setTime(0); //reset clock
+        timer_last = millis(); //initialize for timer()
+        t_now = 0.0; //total seconds since started
+        t_seconds = 0;
+        t_minutes = 0;
+        t_hours = 0;
+        t_days = 0;
+
         start_stop.update(0);
         Reset_total.update(0); //return to zero after values are reset
         dashboard.sendUpdates();
