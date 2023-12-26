@@ -1,6 +1,6 @@
 // DingKey Designs Control Board
 // 12/25/2023
-#define SW_VERSION "v1.0.1"
+#define SW_VERSION "v1.0.2beta"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -166,21 +166,22 @@ void timer(){
         timer_last += 1000;
         t_seconds++;
         t_now += 1.0;
-    }
-    if(t_seconds > 59)
-    {
-        t_seconds = 0;
-        t_minutes++;
-    }
-    if(t_minutes > 59)
-    {
-        t_minutes = 0;
-        t_hours++;
-    }
-    if(t_hours > 23)
-    {
-        t_hours = 0;
-        t_days++;
+        
+        if(t_seconds > 59)
+        {
+            t_seconds = 0;
+            t_minutes++;
+        }
+        if(t_minutes > 59)
+        {
+            t_minutes = 0;
+            t_hours++;
+        }
+        if(t_hours > 23)
+        {
+            t_hours = 0;
+            t_days++;
+        }
     }
 }
 
