@@ -1,13 +1,13 @@
 // DingKey Designs Control Board
 // 12/23/2023
-#define SW_VERSION "v1.0.1beta"
+#define SW_VERSION "v1.0.1"
 
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <Rotary.h>
 #include <regex>
-#include <TimeLib.h>
+//#include <TimeLib.h>
 #include <time.h>
 #include <eng_format.hpp>
 #include <movingAvgFloat.h>
@@ -82,7 +82,7 @@ char rpm_str[6];
 char cph_str[10];
 volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
 unsigned long Run_time_total = 0;
-char Run_time_total_str[15];
+char Run_time_total_str[20];
 
 unsigned long encoder_interval = 5000; //micros, rpm calcuation interval
 movingAvgFloat cps_mov_avg(100); // cycles per second average window based on encoder_interval in micros, if 5000micros interval 20 readings per second
@@ -107,6 +107,7 @@ unsigned long lastSecond = 0;
 
 // Timer variables
 unsigned long timer_last = 0;
+float t_now = 0; //total seconds since started
 uint8 t_seconds = 0;
 uint8 t_minutes = 0;
 uint8 t_hours = 0;
@@ -160,9 +161,11 @@ void counterSetup() {
 
 void timer(){
     if(millis()-timer_last >= 1000)
+    //if(micros()-timer_last >= 1000) //displaytesting only
     {
         timer_last += 1000;
         t_seconds++;
+        t_now += 1.0;
     }
     if(t_seconds > 59)
     {
@@ -181,33 +184,33 @@ void timer(){
     }
 }
 
-// Using timer()
+// Using timer(), needs initialization at end of setup() and inclusion in loop()
+void time_string(){
+    if (t_days>0){
+        snprintf(Run_time_total_str,20, "%ud\n%u:%02u:%02u", t_days, t_hours, t_minutes, t_seconds);
+    }
+    else if (t_hours>0)
+    {
+        snprintf(Run_time_total_str,20, "%u:%02u:%02u", t_hours, t_minutes, t_seconds);
+    }
+    else{
+        snprintf(Run_time_total_str,20, "%um %us", t_minutes, t_seconds);
+    }
+}
+
+// Using TimeLib.h
 // void time_string(){
-//     if (t_days>0){
-//         snprintf(Run_time_total_str,15, "%ud\n%u:%02u:%02u", t_days, t_hours, t_minutes, t_seconds);
+//     if (day()-1>0){
+//         snprintf(Run_time_total_str,15, "%ud\n%u:%02u:%02u", day()-1, hour(), minute(), second());
 //     }
 //     else if (hour()>0)
 //     {
-//         snprintf(Run_time_total_str,15, "%u:%02u:%02u", t_hours, t_minutes, t_seconds);
+//         snprintf(Run_time_total_str,15, "%u:%02u:%02u", hour(), minute(), second());
 //     }
 //     else{
-//         snprintf(Run_time_total_str,15, "%um %us", t_minutes, t_seconds);
+//         snprintf(Run_time_total_str,15, "%um %us", minute(), second());
 //     }
 // }
-
-// Using TimeLib.h
-void time_string(){
-    if (day()-1>0){
-        snprintf(Run_time_total_str,15, "%ud\n%u:%02u:%02u", day()-1, hour(), minute(), second());
-    }
-    else if (hour()>0)
-    {
-        snprintf(Run_time_total_str,15, "%u:%02u:%02u", hour(), minute(), second());
-    }
-    else{
-        snprintf(Run_time_total_str,15, "%um %us", minute(), second());
-    }
-}
 
 String displayLargeNum(double num){
      // Format number for user display
@@ -389,7 +392,7 @@ void setup() {
         run_enable=0;
         u_request=0;
         Cycles_done = 0; //reset number of cycles
-        setTime(0); //reset clock
+        //setTime(0); //reset clock
         start_stop.update(0);
         Reset_total.update(0); //return to zero after values are reset
         dashboard.sendUpdates();
@@ -426,12 +429,14 @@ void setup() {
 
     counterSetup();
     cps_mov_avg.begin();
-    setTime(0); //reset clock for display
+    //setTime(0); //reset clock for display
+    timer_last = millis(); //initialize for timer()
+    //timer_last = micros(); //displaytesting only
 }
 
 void loop() {
     //server.handleClient();
-    
+    timer(); //update time
     total_micros = micros();
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
     if (micros_delta > encoder_interval){
@@ -494,13 +499,9 @@ void loop() {
     case 1: // Machine Run
         if (u_actuations_target>0){
             state=2;
-            //Cycles_done=0;
-            //u_progress=0; //Reset progress upon entering state
         }
         else if (u_timer_target>0){
             state=3;
-            //timer_start=millis();
-            //u_progress=0; //Reset progress upon entering state
         }
         if (!u_request){
             state=0;
@@ -520,19 +521,16 @@ void loop() {
         }
         else if (u_timer_target>0){
             state=4;
-            //timer_start=millis();
-            //u_actuations_target=0;
-            //u_progress=0; //Reset progress upon entering state
         }
         run_enable=1;
         break;
     
     case 3: // Timer Active
-        //Run_time = millis() - timer_start;
-        //u_progress = (float)Run_time / (float)u_timer_target*100.0;
-        u_progress = (float)now() / (float)u_timer_target*100.0;
+        //u_progress = (float)now() / (float)u_timer_target*100.0;
+        u_progress = t_now / (float)u_timer_target*100.0;
         if (u_progress>=100.0){u_progress = 100;}
-        if (!u_request || now()>=u_timer_target){
+        //if (!u_request || now()>=u_timer_target){
+        if (!u_request || t_now>=u_timer_target){
             state=0;
             run_enable=0;
             u_request=0;
@@ -549,7 +547,8 @@ void loop() {
         break;
 
     case 4: //Counter and Timer Active
-        u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), ((float)now()/(float)u_timer_target*100.0) );
+        //u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), ((float)now()/(float)u_timer_target*100.0) );
+        u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), (t_now/(float)u_timer_target*100.0) );
         if (u_progress>=100.0){u_progress = 100;}
         if (!u_request || u_progress>=100.0){
             state=0;
