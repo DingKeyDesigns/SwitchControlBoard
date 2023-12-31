@@ -508,7 +508,7 @@ void setup() {
     display.println(">RPM");
     display.println(">Cycles/hr");
     display.println(">Run Time");
-    display.println(">Access IP:");
+    display.println(">Access IP");
     display.println(myIP);
     display.display();
     delay(5000);
