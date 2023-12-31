@@ -526,13 +526,16 @@ void setup() {
     timer_last = millis(); //initialize for timer()
     //timer_last = micros(); //displaytesting only
     Timer_ON.reset(); //reset ON timer to current millis()
+    Timer_RUN.reset(); //reset ON timer to current millis()
 }
 
 void loop() {
     //server.handleClient();
+    
     timer(); //update time
     Timer_ON.update();
     total_micros = micros();
+    
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
     if (micros_delta > encoder_interval){
         Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
