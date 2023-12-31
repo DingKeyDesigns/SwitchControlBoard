@@ -1,6 +1,6 @@
 // DingKey Designs Control Board
 // 12/31/2023
-#define SW_VERSION "v1.1.0"
+#define SW_VERSION "v1.1.0beta"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -23,10 +23,14 @@
 //TODO new feature estimate time remaining
 //TODO new feature status card for which limit hit counter or timer
 
+//Refresh intervals, performance impact with higher refresh rates
+const int       disp_interval       = 250;  //millis OLED display update interval 4Hz
+const int       dash_interval       = 350;  //millis Web dashboard update interval
+unsigned long   encoder_interval    = 5000; //micros, rpm calcuation interval
+
 //Screen Setup
 #define OLED_RESET 0  // GPIO0
 Adafruit_SSD1306 display(OLED_RESET);
-const int disp_interval = 250;//display update interval millis, 4Hz
 unsigned long disp_millis = 0;
 #define LOGO16_GLCD_HEIGHT 16
 #define LOGO16_GLCD_WIDTH  16
@@ -81,7 +85,6 @@ char cph_str[10];
 volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
 unsigned long Run_time_total = 0;
 char Run_time_total_str[20];
-unsigned long encoder_interval = 5000; //micros, rpm calcuation interval
 movingAvgFloat cps_mov_avg(100); // cycles per second average window based on encoder_interval in micros, if 5000micros interval 20 readings per second
 
 //Motor Control
@@ -105,6 +108,7 @@ unsigned long lastSecond = 0;
 class Switchtimer {
     public:
         Switchtimer();
+        void set(unsigned long time);
         void update();
         void reset();
         float now();
@@ -128,6 +132,10 @@ Switchtimer::Switchtimer(){
     _hours = 0;
     _days = 0;
 };
+
+void Switchtimer::set(unsigned long time){
+    _start_millis = time;
+}
 
 void Switchtimer::update(){
     if(millis()-_start_millis >= 1000)
@@ -275,7 +283,6 @@ String displayLargeNum(double num){
 ESPDash dashboard(&server); //Attach ESP-DASH to AsyncWebServer
 unsigned long dash_millis = 0;
 unsigned long dash_millis_delta = 0;
-const int dash_interval = 350;//update interval millis
 
 Card start_stop(&dashboard, BUTTON_CARD, "Start/Stop");
 Card motor_speed(&dashboard, GENERIC_CARD, "Motor Speed", "rpm");
@@ -290,7 +297,9 @@ Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes, HH:MM)");
 
 Tab totals_tab(&dashboard, "Totals");
 Card Cycles_total(&dashboard, GENERIC_CARD, "Total Actuation Cycles");
-Card Run_total(&dashboard, GENERIC_CARD, "Machine On Time");
+Card Run_total(&dashboard, GENERIC_CARD, "Machine On Time (old)");
+Card Machine_on_time(&dashboard, GENERIC_CARD, "Machine On Time");
+Card Machine_run_time(&dashboard, GENERIC_CARD, "Machine Run Time ");
 Card Reset_total(&dashboard, BUTTON_CARD, "Reset All Totals");
 
 void dashboardUpdateValues(){
@@ -302,6 +311,8 @@ void dashboardUpdateValues(){
         cycle_speed.update(cph_str);
         actuations_progress.update(u_progress);
         Run_total.update(Run_time_total_str);
+        Machine_on_time.update(Timer_ON.timestring());
+        Machine_run_time.update(Timer_RUN.timestring());
         Cycles_total.update(displayLargeNum(Cycles_done));
 
         dashboard.sendUpdates();
@@ -469,12 +480,18 @@ void setup() {
         t_hours = 0;
         t_days = 0;
 
+        //Timer_ON.reset(); // Machine on time cannot be reset
+        Timer_RUN.reset();
+
         start_stop.update(0);
         Reset_total.update(0); //return to zero after values are reset
+
         dashboard.sendUpdates();
     });
 
     Run_total.setTab(&totals_tab);
+    Machine_on_time.setTab(&totals_tab);
+    Machine_run_time.setTab(&totals_tab);
     Cycles_total.setTab(&totals_tab);
     Reset_total.setTab(&totals_tab);
 
@@ -570,6 +587,7 @@ void loop() {
     case 0: // Idle
         if (u_request){
             state=1;
+            Timer_RUN.set(millis()); //set start time for timer on transition to run_enable
         }
         run_enable=0;
         break;
@@ -604,10 +622,8 @@ void loop() {
         break;
     
     case 3: // Timer Active
-        //u_progress = (float)now() / (float)u_timer_target*100.0;
         u_progress = t_now / (float)u_timer_target*100.0;
         if (u_progress>=100.0){u_progress = 100;}
-        //if (!u_request || now()>=u_timer_target){
         if (!u_request || t_now>=u_timer_target){
             state=0;
             run_enable=0;
@@ -618,8 +634,6 @@ void loop() {
         else if (u_actuations_target>0)
         {
             state=4;
-            //u_timer_target=0;
-            //u_progress=0; //Reset progress upon entering state
         }
         run_enable=1;
         break;
@@ -662,6 +676,10 @@ void loop() {
 
     //Motor Command
     analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
+
+    if (run_enable){
+        Timer_RUN.update();
+    }
 
     dashboardUpdateValues(); //interval controlled within function
 
