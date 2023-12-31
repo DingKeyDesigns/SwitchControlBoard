@@ -507,8 +507,8 @@ void setup() {
     display.println(">Cycles");
     display.println(">RPM");
     display.println(">Cycles/hr");
-    display.println(">On Time");
-    display.println(">IP:");
+    display.println(">Run Time");
+    display.println(">Access IP:");
     display.println(myIP);
     display.display();
     delay(5000);
@@ -567,7 +567,8 @@ void loop() {
         display.println(cph_str);
         
         time_string(); //update display time string
-        display.println(Run_time_total_str);
+        //display.println(Run_time_total_str);
+        display.println(Timer_RUN.timestring());
 
         display.println(myIP);
 
