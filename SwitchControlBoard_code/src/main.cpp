@@ -1,6 +1,6 @@
 // DingKey Designs Control Board
 // 12/31/2023
-#define SW_VERSION "v1.0.3beta"
+#define SW_VERSION "v1.0.3"
 
 #include <Arduino.h>
 #include <SPI.h>
