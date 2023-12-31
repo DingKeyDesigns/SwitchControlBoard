@@ -1,5 +1,5 @@
 // DingKey Designs Control Board
-// 12/25/2023
+// 12/30/2023
 #define SW_VERSION "v1.0.2beta"
 
 #include <Arduino.h>
@@ -20,10 +20,11 @@
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncTCP.h>
 #include <ESPDashPro.h>
-//TODO estimate time remaining
-//TODO greater than 24h limit
-//TODO map run_enable to state just prior to command
-//TODO status card for which limit hit counter or timer
+//TODO new feature EEPROM non-volatile memory for cycles and run time
+//TODO new feature counter for run-time and on-time
+//TODO new feature estimate time remaining
+//TODO new feature status card for which limit hit counter or timer
+
 
 //Screen Setup
 #define OLED_RESET 0  // GPIO0
@@ -65,7 +66,7 @@ Rotary r = Rotary(ROTARY_PIN1, ROTARY_PIN2);
 //Motor Configruation 2, 11 pulses per rotation, divide by 2 two actuations per rotation
 //280rpm:  Gear Ratio 281rpm 1:21.3
 //#define MOTOR_CONFIG "280rpm"
-//#define STEPS_ROTATION 117.15 //281rpm 11 pulses per rotation, Gear ratio 176rpm 1:34, Gear Ratio 281rpm 1:21.3, divide by 2 two actuations per rotation
+//#define STEPS_ROTATION 117.15
 
 volatile unsigned long MotorEncoderPos = 0;
 volatile unsigned long totalEncoderPos = 0;
@@ -74,32 +75,29 @@ unsigned long lastEncoderPos = 0;
 unsigned long last_micros = 0;
 unsigned long Encoder_delta = 0;
 unsigned long micros_delta = 0;
-float cps = 0; // cycles per second
-float cps_avg = 0; // cycles per second, filtered
-float rpm = 0; // calculated from smoothed cps_avg
-float cph = 0; // calculated from additional smoothed cps_avg, cycles per hour
+float cps       = 0; // cycles per second
+float cps_avg   = 0; // cycles per second, filtered
+float rpm       = 0; // calculated from smoothed cps_avg
+float cph       = 0; // calculated from smoothed cps_avg, cycles per hour
 char rpm_str[6];
 char cph_str[10];
 volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
 unsigned long Run_time_total = 0;
 char Run_time_total_str[20];
-
 unsigned long encoder_interval = 5000; //micros, rpm calcuation interval
 movingAvgFloat cps_mov_avg(100); // cycles per second average window based on encoder_interval in micros, if 5000micros interval 20 readings per second
-
-//TODO eeprom non-volatile memeory for cycle time count
 
 //Motor Control
 #define MOTOR_PWM D7
 int pwm_command = 0;
 
 //State Machine
-int state=1;
-bool run_enable = 1; //start in running status TODO this feature is not working to initialize machine as enabled
-int u_request = 1;
-int u_speed_target = 100; //percentage beteween 30-100
-const int u_speed_target_lim1 = 30;
-const int u_speed_target_lim2 = 100;
+int state       = 1;
+bool run_enable = 1; //start in running status
+int u_request   = 1;
+int u_speed_target              = 100; //percentage beteween 30-100
+const int u_speed_target_lim1   = 30;
+const int u_speed_target_lim2   = 100;
 float u_progress = 0; //percentage completion between 0-100%
 unsigned long u_actuations_target = 0; //requested number of cycles
 unsigned long u_timer_target = 0; //requested timer
