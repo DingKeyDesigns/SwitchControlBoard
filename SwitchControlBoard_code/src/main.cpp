@@ -1,6 +1,6 @@
 // DingKey Designs Control Board
-// 12/30/2023
-#define SW_VERSION "v1.0.2beta"
+// 12/31/2023
+#define SW_VERSION "v1.0.3beta"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -119,12 +119,10 @@ const int dash_interval = 350;//update interval millis
 
 Card start_stop(&dashboard, BUTTON_CARD, "Start/Stop");
 Card motor_speed(&dashboard, GENERIC_CARD, "Motor Speed", "rpm");
-//Card cycle_speed(&dashboard, GENERIC_CARD, "Actuations Speed", "per hour");
+Card cycle_speed(&dashboard, GENERIC_CARD, "Actuations Speed", "per hour");
 Card motor_speed_target(&dashboard, SLIDER_CARD, "Motor Speed", "%", 30, 100);
 
 Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "%", 0, 100);
-//Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000000);
-//Card actuations_target(&dashboard, SLIDER_CARD, "Target Actuations", "", 0, 1000); //displaytesting only
 Card actuations_target_display(&dashboard, GENERIC_CARD, "Target Actuations Set");
 Card actuations_input(&dashboard, TEXT_INPUT_CARD, "Target Actuations");
 Card timer_target_display(&dashboard, GENERIC_CARD, "Timer Set (HH:MM)");
@@ -315,7 +313,6 @@ void setup() {
         dashboard.sendUpdates();
     });
     
-
     motor_speed_target.attachCallback([&](int value){
         //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
         u_speed_target = value;
@@ -324,16 +321,6 @@ void setup() {
     });
     motor_speed_target.update(100); //default speed
     dashboard.sendUpdates();
-
-    /*
-    actuations_target.attachCallback([&](int value){
-        //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
-        //value = value/1000*1000; // round to nearest 1000 disabled for displaytesting only
-        u_actuations_target = value;
-        actuations_target.update(value);
-        dashboard.sendUpdates();
-    });
-    */
     
     // Cycles input needs to be whole number
     actuations_input.attachCallback([&](const char* value){
@@ -598,7 +585,7 @@ void loop() {
         dash_millis =  millis();
         start_stop.update(run_enable); //dashboard update
         motor_speed.update(rpm_str);
-        //cycle_speed.update(cph_str);
+        cycle_speed.update(cph_str);
         actuations_progress.update(u_progress);
         Run_total.update(Run_time_total_str);
         Cycles_total.update(displayLargeNum(Cycles_done));
