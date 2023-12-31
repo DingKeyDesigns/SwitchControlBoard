@@ -1,6 +1,6 @@
 // DingKey Designs Control Board
 // 12/31/2023
-#define SW_VERSION "v1.0.3"
+#define SW_VERSION "v1.1.0"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -22,7 +22,6 @@
 //TODO new feature counter for run-time and on-time
 //TODO new feature estimate time remaining
 //TODO new feature status card for which limit hit counter or timer
-
 
 //Screen Setup
 #define OLED_RESET 0  // GPIO0
@@ -101,6 +100,91 @@ unsigned long u_actuations_target = 0; //requested number of cycles
 unsigned long u_timer_target = 0; //requested timer
 unsigned long lastSecond = 0;
 
+// Timer Class
+
+class Switchtimer {
+    public:
+        Switchtimer();
+        void update();
+        void reset();
+        float now();
+        String timestring();
+
+    private:
+        unsigned long _start_millis;
+        float _now;
+        uint8 _seconds;
+        uint8 _minutes;
+        uint8 _hours;
+        uint16 _days;
+        char _timestr[20];
+};
+
+Switchtimer::Switchtimer(){
+    _start_millis = 0;
+    _now = 0.0;
+    _seconds = 0;
+    _minutes = 0;
+    _hours = 0;
+    _days = 0;
+};
+
+void Switchtimer::update(){
+    if(millis()-_start_millis >= 1000)
+    //if(micros()-timer_last >= 1000) //displaytesting only
+    {
+        _start_millis += 1000;
+        _seconds++;
+        _now += 1.0;
+        
+        if(_seconds > 59)
+        {
+            _seconds = 0;
+            _minutes++;
+        }
+        if(_minutes > 59)
+        {
+            _minutes = 0;
+            _hours++;
+        }
+        if(_hours > 23)
+        {
+            _hours = 0;
+            _days++;
+        }
+    }
+};
+
+void Switchtimer::reset(){
+    _start_millis = millis();
+    _now = 0.0;
+    _seconds = 0;
+    _minutes = 0;
+    _hours = 0;
+    _days = 0;
+};
+
+float Switchtimer::now(){
+    return _now;
+};
+
+String Switchtimer::timestring(){
+    if (_days>0){
+        snprintf(_timestr,20, "%ud\n%u:%02u:%02u", _days, _hours, _minutes, _seconds);
+    }
+    else if (_hours>0)
+    {
+        snprintf(_timestr,20, "%u:%02u:%02u", _hours, _minutes, _seconds);
+    }
+    else{
+        snprintf(_timestr,20, "%um %us", _minutes, _seconds);
+    }
+    return String(_timestr);
+};
+
+Switchtimer Timer_ON;
+Switchtimer Timer_RUN;
+
 // Timer variables
 unsigned long timer_last = 0;
 float t_now = 0.0; //total seconds since started
@@ -108,6 +192,32 @@ uint8 t_seconds = 0;
 uint8 t_minutes = 0;
 uint8 t_hours = 0;
 uint16 t_days = 0;
+
+void timer(){
+    if(millis()-timer_last >= 1000)
+    //if(micros()-timer_last >= 1000) //displaytesting only
+    {
+        timer_last += 1000;
+        t_seconds++;
+        t_now += 1.0;
+        
+        if(t_seconds > 59)
+        {
+            t_seconds = 0;
+            t_minutes++;
+        }
+        if(t_minutes > 59)
+        {
+            t_minutes = 0;
+            t_hours++;
+        }
+        if(t_hours > 23)
+        {
+            t_hours = 0;
+            t_days++;
+        }
+    }
+}
 
 // Using timer(), needs initialization at end of setup() and inclusion in loop()
 void time_string(){
@@ -219,33 +329,6 @@ void counterSetup() {
     attachInterrupt(digitalPinToInterrupt(ROTARY_PIN2), doMotorEncoder, CHANGE);
     total_micros = micros(); //prevents divide by zero
 }
-
-void timer(){
-    if(millis()-timer_last >= 1000)
-    //if(micros()-timer_last >= 1000) //displaytesting only
-    {
-        timer_last += 1000;
-        t_seconds++;
-        t_now += 1.0;
-        
-        if(t_seconds > 59)
-        {
-            t_seconds = 0;
-            t_minutes++;
-        }
-        if(t_minutes > 59)
-        {
-            t_minutes = 0;
-            t_hours++;
-        }
-        if(t_hours > 23)
-        {
-            t_hours = 0;
-            t_days++;
-        }
-    }
-}
-
 
 void setup() {
     Serial.begin(115200);
@@ -425,11 +508,13 @@ void setup() {
     //setTime(0); //reset clock for display
     timer_last = millis(); //initialize for timer()
     //timer_last = micros(); //displaytesting only
+    Timer_ON.reset(); //reset ON timer to current millis()
 }
 
 void loop() {
     //server.handleClient();
     timer(); //update time
+    Timer_ON.update();
     total_micros = micros();
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
     if (micros_delta > encoder_interval){
