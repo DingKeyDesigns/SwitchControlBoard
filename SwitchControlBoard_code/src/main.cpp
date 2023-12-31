@@ -133,6 +133,21 @@ Card Cycles_total(&dashboard, GENERIC_CARD, "Total Actuation Cycles");
 Card Run_total(&dashboard, GENERIC_CARD, "Total Run Time");
 Card Reset_total(&dashboard, BUTTON_CARD, "Reset All Totals");
 
+void dashboardUpdateValues(){
+    dash_millis_delta =  millis()-dash_millis;
+    if (dash_millis_delta >= dash_interval) {
+        dash_millis =  millis();
+        start_stop.update(run_enable); //dashboard update
+        motor_speed.update(rpm_str);
+        cycle_speed.update(cph_str);
+        actuations_progress.update(u_progress);
+        Run_total.update(Run_time_total_str);
+        Cycles_total.update(displayLargeNum(Cycles_done));
+
+        dashboard.sendUpdates();
+    }
+}
+
 IRAM_ATTR void doMotorEncoder() {
   unsigned char mresult = r.process();
   if (mresult == DIR_CW || mresult == DIR_CCW) {
@@ -580,18 +595,7 @@ void loop() {
     //Motor Command
     analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
 
-    dash_millis_delta =  millis()-dash_millis;
-    if (dash_millis_delta>= dash_interval) {
-        dash_millis =  millis();
-        start_stop.update(run_enable); //dashboard update
-        motor_speed.update(rpm_str);
-        cycle_speed.update(cph_str);
-        actuations_progress.update(u_progress);
-        Run_total.update(Run_time_total_str);
-        Cycles_total.update(displayLargeNum(Cycles_done));
-
-        dashboard.sendUpdates();
-    }
+    dashboardUpdateValues(); //interval controlled within function
 
     yield();
 
