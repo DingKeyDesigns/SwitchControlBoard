@@ -29,7 +29,7 @@
 //Screen Setup
 #define OLED_RESET 0  // GPIO0
 Adafruit_SSD1306 display(OLED_RESET);
-const int disp_interval = 100;//display update interval millis
+const int disp_interval = 250;//display update interval millis, 4Hz
 unsigned long disp_millis = 0;
 #define LOGO16_GLCD_HEIGHT 16
 #define LOGO16_GLCD_WIDTH  16
