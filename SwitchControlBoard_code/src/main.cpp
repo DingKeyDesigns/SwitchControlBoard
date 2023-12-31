@@ -507,7 +507,7 @@ void setup() {
     display.println(">Cycles");
     display.println(">RPM");
     display.println(">Cycles/hr");
-    display.println(">Run Time");
+    display.println(">On Time");
     display.println(">IP:");
     display.println(myIP);
     display.display();
