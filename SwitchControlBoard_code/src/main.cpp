@@ -123,14 +123,14 @@ Card cycle_speed(&dashboard, GENERIC_CARD, "Actuations Speed", "per hour");
 Card motor_speed_target(&dashboard, SLIDER_CARD, "Motor Speed", "%", 30, 100);
 
 Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "%", 0, 100);
-Card actuations_target_display(&dashboard, GENERIC_CARD, "Target Actuations Set");
+//Card actuations_target_display(&dashboard, GENERIC_CARD, "Target Actuations Set");
 Card actuations_input(&dashboard, TEXT_INPUT_CARD, "Target Actuations");
-Card timer_target_display(&dashboard, GENERIC_CARD, "Timer Set (HH:MM)");
+//Card timer_target_display(&dashboard, GENERIC_CARD, "Timer Set (HH:MM)");
 Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes, HH:MM)");
 
 Tab totals_tab(&dashboard, "Totals");
 Card Cycles_total(&dashboard, GENERIC_CARD, "Total Actuation Cycles");
-Card Run_total(&dashboard, GENERIC_CARD, "Total Run Time");
+Card Run_total(&dashboard, GENERIC_CARD, "Machine On Time");
 Card Reset_total(&dashboard, BUTTON_CARD, "Reset All Totals");
 
 void dashboardUpdateValues(){
@@ -349,13 +349,12 @@ void setup() {
             }
             u_actuations_target_str = std::to_string(u_actuations_target);
             actuations_input.update(u_actuations_target_str.c_str());
-            actuations_target_display.update(u_actuations_target_str.c_str());
+            //actuations_target_display.update(u_actuations_target_str.c_str());
         }
         else{
             actuations_input.update("Check Input, Whole Numbers Only");
         }
         dashboard.sendUpdates();
-        dashboard.sendUpdates(); // TODO investigate why unchanging on first try
     });
     
     // Timer input needs to be in HH:MM format
@@ -378,14 +377,13 @@ void setup() {
                 u_timer_target_str = std::to_string(u_timer_target_h) + ":" + std::to_string(u_timer_target_m);
             }
             timer_target.update(u_timer_target_str.c_str());
-            timer_target_display.update(u_timer_target_str.c_str());
+            //timer_target_display.update(u_timer_target_str.c_str());
             u_timer_target = (u_timer_target_h*3600 + u_timer_target_m*60)*1; // in seconds
         }
         else{
             timer_target.update("Check Input Format HH:MM");
         }
         dashboard.sendUpdates();
-        dashboard.sendUpdates(); // TODO investigate why unchanging on first try
     });
     
     Reset_total.attachCallback([&](int value){
