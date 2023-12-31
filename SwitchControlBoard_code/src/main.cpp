@@ -7,8 +7,6 @@
 #include <Wire.h>
 #include <Rotary.h>
 #include <regex>
-//#include <TimeLib.h>
-//#include <time.h>
 #include <eng_format.hpp>
 #include <movingAvgFloat.h>
 
@@ -111,6 +109,58 @@ uint8 t_minutes = 0;
 uint8 t_hours = 0;
 uint16 t_days = 0;
 
+// Using timer(), needs initialization at end of setup() and inclusion in loop()
+void time_string(){
+    if (t_days>0){
+        snprintf(Run_time_total_str,20, "%ud\n%u:%02u:%02u", t_days, t_hours, t_minutes, t_seconds);
+    }
+    else if (t_hours>0)
+    {
+        snprintf(Run_time_total_str,20, "%u:%02u:%02u", t_hours, t_minutes, t_seconds);
+    }
+    else{
+        snprintf(Run_time_total_str,20, "%um %us", t_minutes, t_seconds);
+    }
+}
+
+String displayLargeNum(double num){
+     // Format number for user display
+     // Set number of displayed digits without trailing zeros, down to precision of 1.0
+
+    int display_prec = 1; // for number of cycles display precision
+
+    if (num<10){
+        display_prec = 1;
+    }
+    else if (num<100)
+    {
+        display_prec = 2;
+    }
+    else if (num<1000)
+    {
+        display_prec = 3;
+    }
+    else if (num<10000)
+    {
+        display_prec = 4;
+    }
+    else if (num<100000)
+    {
+        display_prec = 5;
+    }
+    else if (num<1000000)
+    {
+        display_prec = 6;
+    }
+    else
+    {
+        display_prec = 7;
+    }
+    std::string num_str = to_engineering_string(Cycles_done,display_prec,eng_prefixed);
+    
+    return String(num_str.c_str());
+}
+
 // Dashboard Interface
 ESPDash dashboard(&server); //Attach ESP-DASH to AsyncWebServer
 unsigned long dash_millis = 0;
@@ -196,71 +246,6 @@ void timer(){
     }
 }
 
-// Using timer(), needs initialization at end of setup() and inclusion in loop()
-void time_string(){
-    if (t_days>0){
-        snprintf(Run_time_total_str,20, "%ud\n%u:%02u:%02u", t_days, t_hours, t_minutes, t_seconds);
-    }
-    else if (t_hours>0)
-    {
-        snprintf(Run_time_total_str,20, "%u:%02u:%02u", t_hours, t_minutes, t_seconds);
-    }
-    else{
-        snprintf(Run_time_total_str,20, "%um %us", t_minutes, t_seconds);
-    }
-}
-
-// Using TimeLib.h
-// void time_string(){
-//     if (day()-1>0){
-//         snprintf(Run_time_total_str,15, "%ud\n%u:%02u:%02u", day()-1, hour(), minute(), second());
-//     }
-//     else if (hour()>0)
-//     {
-//         snprintf(Run_time_total_str,15, "%u:%02u:%02u", hour(), minute(), second());
-//     }
-//     else{
-//         snprintf(Run_time_total_str,15, "%um %us", minute(), second());
-//     }
-// }
-
-String displayLargeNum(double num){
-     // Format number for user display
-     // Set number of displayed digits without trailing zeros, down to precision of 1.0
-
-    int display_prec = 1; // for number of cycles display precision
-
-    if (num<10){
-        display_prec = 1;
-    }
-    else if (num<100)
-    {
-        display_prec = 2;
-    }
-    else if (num<1000)
-    {
-        display_prec = 3;
-    }
-    else if (num<10000)
-    {
-        display_prec = 4;
-    }
-    else if (num<100000)
-    {
-        display_prec = 5;
-    }
-    else if (num<1000000)
-    {
-        display_prec = 6;
-    }
-    else
-    {
-        display_prec = 7;
-    }
-    std::string num_str = to_engineering_string(Cycles_done,display_prec,eng_prefixed);
-    
-    return String(num_str.c_str());
-}
 
 void setup() {
     Serial.begin(115200);
