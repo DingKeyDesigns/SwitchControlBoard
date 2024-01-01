@@ -22,6 +22,7 @@
 //TODO new feature counter for run-time and on-time
 //TODO new feature estimate time remaining
 //TODO new feature status card for which limit hit counter or timer
+//TODO new feature multiple display configurations select
 
 //Refresh intervals, performance impact with higher refresh rates
 const int       disp_interval       = 250;  //millis OLED display update interval 4Hz
@@ -190,56 +191,56 @@ String Switchtimer::timestring(){
     return String(_timestr);
 };
 
-Switchtimer Timer_ON;
-Switchtimer Timer_RUN;
+Switchtimer Timer_ON;  //timer 1, machine total on time
+Switchtimer Timer_RUN; //timer 2, machine run time only
 
 // Timer variables
-unsigned long timer_last = 0;
-float t_now = 0.0; //total seconds since started
-uint8 t_seconds = 0;
-uint8 t_minutes = 0;
-uint8 t_hours = 0;
-uint16 t_days = 0;
+// unsigned long timer_last = 0;
+// float t_now = 0.0; //total seconds since started
+// uint8 t_seconds = 0;
+// uint8 t_minutes = 0;
+// uint8 t_hours = 0;
+// uint16 t_days = 0;
 
-void timer(){
-    if(millis()-timer_last >= 1000)
-    //if(micros()-timer_last >= 1000) //displaytesting only
-    {
-        timer_last += 1000;
-        t_seconds++;
-        t_now += 1.0;
+// void timer(){
+//     if(millis()-timer_last >= 1000)
+//     //if(micros()-timer_last >= 1000) //displaytesting only
+//     {
+//         timer_last += 1000;
+//         t_seconds++;
+//         t_now += 1.0;
         
-        if(t_seconds > 59)
-        {
-            t_seconds = 0;
-            t_minutes++;
-        }
-        if(t_minutes > 59)
-        {
-            t_minutes = 0;
-            t_hours++;
-        }
-        if(t_hours > 23)
-        {
-            t_hours = 0;
-            t_days++;
-        }
-    }
-}
+//         if(t_seconds > 59)
+//         {
+//             t_seconds = 0;
+//             t_minutes++;
+//         }
+//         if(t_minutes > 59)
+//         {
+//             t_minutes = 0;
+//             t_hours++;
+//         }
+//         if(t_hours > 23)
+//         {
+//             t_hours = 0;
+//             t_days++;
+//         }
+//     }
+// }
 
 // Using timer(), needs initialization at end of setup() and inclusion in loop()
-void time_string(){
-    if (t_days>0){
-        snprintf(Run_time_total_str,20, "%ud\n%u:%02u:%02u", t_days, t_hours, t_minutes, t_seconds);
-    }
-    else if (t_hours>0)
-    {
-        snprintf(Run_time_total_str,20, "%u:%02u:%02u", t_hours, t_minutes, t_seconds);
-    }
-    else{
-        snprintf(Run_time_total_str,20, "%um %us", t_minutes, t_seconds);
-    }
-}
+// void time_string(){
+//     if (t_days>0){
+//         snprintf(Run_time_total_str,20, "%ud\n%u:%02u:%02u", t_days, t_hours, t_minutes, t_seconds);
+//     }
+//     else if (t_hours>0)
+//     {
+//         snprintf(Run_time_total_str,20, "%u:%02u:%02u", t_hours, t_minutes, t_seconds);
+//     }
+//     else{
+//         snprintf(Run_time_total_str,20, "%um %us", t_minutes, t_seconds);
+//     }
+// }
 
 String displayLargeNum(double num){
      // Format number for user display
@@ -473,12 +474,12 @@ void setup() {
         
         // Reset timer
         //setTime(0); //reset clock
-        timer_last = millis(); //initialize for timer()
-        t_now = 0.0; //total seconds since started
-        t_seconds = 0;
-        t_minutes = 0;
-        t_hours = 0;
-        t_days = 0;
+        // timer_last = millis(); //initialize for timer()
+        // t_now = 0.0; //total seconds since started
+        // t_seconds = 0;
+        // t_minutes = 0;
+        // t_hours = 0;
+        // t_days = 0;
 
         //Timer_ON.reset(); // Machine on time cannot be reset
         Timer_RUN.reset();
@@ -523,7 +524,7 @@ void setup() {
     counterSetup();
     cps_mov_avg.begin();
     //setTime(0); //reset clock for display
-    timer_last = millis(); //initialize for timer()
+    // timer_last = millis(); //initialize for timer()
     //timer_last = micros(); //displaytesting only
     Timer_ON.reset(); //reset ON timer to current millis()
     Timer_RUN.reset(); //reset ON timer to current millis()
@@ -532,10 +533,10 @@ void setup() {
 void loop() {
     //server.handleClient();
     
-    timer(); //update time
+    // timer(); //update time
     Timer_ON.update();
-    total_micros = micros();
     
+    total_micros = micros();
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
     if (micros_delta > encoder_interval){
         Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
@@ -551,11 +552,8 @@ void loop() {
     if (millis()-disp_millis >= disp_interval) { //throttled for performance
         disp_millis = millis();
         display.clearDisplay();
-        // display.setTextSize(1);
-        // display.setTextColor(WHITE);
         display.setCursor(0,0);
         
-        //display.print("C:");
         display.println(displayLargeNum(Cycles_done));
         
         display.print("RPM:");
@@ -566,7 +564,7 @@ void loop() {
         snprintf(cph_str,10,"%.0f",abs(cph));
         display.println(cph_str);
         
-        time_string(); //update display time string
+        //time_string(); //update display time string
         //display.println(Run_time_total_str);
         display.println(Timer_RUN.timestring());
 
@@ -626,9 +624,11 @@ void loop() {
         break;
     
     case 3: // Timer Active
-        u_progress = t_now / (float)u_timer_target*100.0;
+        //u_progress = t_now / (float)u_timer_target*100.0;
+        u_progress = Timer_RUN.now() / (float)u_timer_target*100.0;
         if (u_progress>=100.0){u_progress = 100;}
-        if (!u_request || t_now>=u_timer_target){
+        //if (!u_request || t_now>=u_timer_target){
+        if (!u_request || Timer_RUN.now()>=u_timer_target){
             state=0;
             run_enable=0;
             u_request=0;
@@ -644,7 +644,8 @@ void loop() {
 
     case 4: //Counter and Timer Active
         //u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), ((float)now()/(float)u_timer_target*100.0) );
-        u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), (t_now/(float)u_timer_target*100.0) );
+        //u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), (t_now/(float)u_timer_target*100.0) );
+        u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), (Timer_RUN.now()/(float)u_timer_target*100.0) );
         if (u_progress>=100.0){u_progress = 100;}
         if (!u_request || u_progress>=100.0){
             state=0;
