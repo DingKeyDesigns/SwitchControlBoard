@@ -9,6 +9,7 @@
 #include <regex>
 #include <eng_format.hpp>
 #include <movingAvgFloat.h>
+// #include <ESP_EEPROM.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -23,11 +24,13 @@
 //TODO new feature estimate time remaining
 //TODO new feature status card for which limit hit counter or timer
 //TODO new feature multiple display configurations select
+//TODO new feature totalizer for cycles
 
 //Refresh intervals, performance impact with higher refresh rates
 const int       disp_interval       = 250;  //millis OLED display update interval 4Hz
 const int       dash_interval       = 350;  //millis Web dashboard update interval
-unsigned long   encoder_interval    = 5000; //micros, rpm calcuation interval
+const unsigned long   encoder_interval    = 5000; //micros, rpm calcuation interval
+// const int       memory_interval     = 10000;  //millis EEPROM save interval
 
 //Screen Setup
 #define OLED_RESET 0  // GPIO0
@@ -104,7 +107,6 @@ unsigned long u_timer_target = 0; //requested timer
 unsigned long lastSecond = 0;
 
 // Timer Class
-
 class Switchtimer {
     public:
         Switchtimer();
@@ -251,6 +253,15 @@ Card Machine_run_time(&dashboard, GENERIC_CARD, "Machine Run Time ");
 Card Reset_total(&dashboard, BUTTON_CARD, "Reset All Totals");
 Card Machine_on_time(&dashboard, GENERIC_CARD, "Machine On Time");
 
+// Statistic stata1(&dashboard, "Machine On Time", "-");
+// Statistic stata2(&dashboard, "Machine Run Time", "-");
+// Statistic stata3(&dashboard, "Machine Cycles", "-");
+
+// Statistic statb1(&dashboard, "Last On Time", "-");
+// Statistic statb2(&dashboard, "Last Run Time", "-");
+// Statistic statb3(&dashboard, "Last Cycles", "-");
+// Statistic statb4(&dashboard, "Total Cycles", "-");
+
 void dashboardUpdateValues(){
     dash_millis_delta =  millis()-dash_millis;
     if (dash_millis_delta >= dash_interval) {
@@ -267,6 +278,26 @@ void dashboardUpdateValues(){
     }
 }
 
+// EEPROM Save Config
+// unsigned long memory_millis =  0;
+// float last_on = 0;
+// float last_run = 0;
+// double last_cycles = 0;
+// double total_cycles = 0;
+
+// void saveMemory(){
+//     if (millis()-memory_millis >= memory_interval){
+//         memory_millis = millis();
+//         EEPROM.put(0, Timer_ON.now()); // float
+//         EEPROM.put(4, Timer_RUN.now()); // float
+//         double Cycles_done_save = Cycles_done;
+//         EEPROM.put(8, Cycles_done_save); // double
+//         bool ok_commit = EEPROM.commit();
+//         Serial.println((ok_commit) ? "Memory Commit OK" : "Commit failed");
+//     }
+// }
+
+// Encoder interrupt
 IRAM_ATTR void doMotorEncoder() {
   unsigned char mresult = r.process();
   if (mresult == DIR_CW || mresult == DIR_CCW) {
@@ -280,6 +311,7 @@ IRAM_ATTR void doMotorEncoder() {
   }
 }
 
+// Encoder Hardware
 void counterSetup() {
     pinMode(ROTARY_PIN1, INPUT_PULLUP);
     pinMode(ROTARY_PIN2, INPUT_PULLUP);
@@ -323,7 +355,7 @@ void setup() {
     else
     {
         Serial.print(n);
-        Serial.println("Networks found");
+        Serial.println(" Networks found");
         for (int i = 0; i < n; ++i)
         {
         Serial.println(WiFi.SSID(i)); // Print SSID and RSSI for each network found
@@ -434,6 +466,28 @@ void setup() {
     start_stop.update((int) u_request); // initial state is machine running, without any user input
     dashboard.sendUpdates();
 
+    // // EEPROM Setup
+    // EEPROM.begin(24); // float, float, double, double
+    // EEPROM.get(0, last_on);
+    // EEPROM.get(4, last_run);
+    // EEPROM.get(8, last_cycles);
+    // EEPROM.get(16, total_cycles);
+    
+    // Serial.println(last_on);
+    // Serial.println(last_run);
+    // Serial.println(last_cycles);
+    // Serial.println(total_cycles);
+    
+    // total_cycles = total_cycles + last_cycles; // totalizer
+    // EEPROM.put(16, total_cycles);
+    // bool ok_commit = EEPROM.commit();
+    // Serial.println((ok_commit) ? "Totalzier Commit OK" : " Totalizer Commit failed");
+
+    // statb1.set("Last On Time", (std::to_string(last_on)).c_str());
+    // statb2.set("Last Run Time", (std::to_string(last_on)).c_str());
+    // statb3.set("Last Cycles", (std::to_string(last_on)).c_str());
+    // statb4.set("Total Cycles", (std::to_string(last_on)).c_str());
+
     //Splash Screen 2
     delay(2000);
     display.clearDisplay();
@@ -456,9 +510,11 @@ void setup() {
     display.setTextColor(WHITE);
     display.setCursor(0,0);
 
+    // Encoder Setup
     counterSetup();
     cps_mov_avg.begin();
 
+    // Timer Setup
     Timer_ON.reset(); //reset ON timer to current millis()
     Timer_RUN.reset(); //reset ON timer to current millis()
 }
@@ -600,6 +656,9 @@ void loop() {
         Timer_RUN.update();
     }
 
+    // Commit to flash memory for power-off
+    // saveMemory();
+
     // Web Dashboard Update
     dashboardUpdateValues(); //interval controlled within function
 
@@ -620,4 +679,3 @@ void loop() {
     //   Cycles_done += 10; //displaytesting only, simulated cycles
     //}
     }
-
