@@ -1,6 +1,6 @@
 // DingKey Designs Control Board
-// 12/31/2023
-#define SW_VERSION "v1.1.0beta"
+// 1/1/2023
+#define SW_VERSION "v1.1.0"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -19,18 +19,22 @@
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncTCP.h>
 #include <ESPDashPro.h>
+
 //TODO new feature EEPROM non-volatile memory for cycles and run time
-//TODO new feature counter for run-time and on-time
 //TODO new feature estimate time remaining
 //TODO new feature status card for which limit hit counter or timer
 //TODO new feature multiple display configurations select
 //TODO new feature totalizer for cycles
 
 //Refresh intervals, performance impact with higher refresh rates
-const int       disp_interval       = 250;  //millis OLED display update interval 4Hz
-const int       dash_interval       = 350;  //millis Web dashboard update interval
+const int       disp_interval       = 200;  //millis OLED display update interval 4Hz
+const int       dash_interval       = 333;  //millis Web dashboard update interval
 const unsigned long   encoder_interval    = 5000; //micros, rpm calcuation interval
 // const int       memory_interval     = 10000;  //millis EEPROM save interval
+
+//Power LED
+#define ENABLE_PIN D8
+#define ledPin LED_BUILTIN  // the number of the LED pin
 
 //Screen Setup
 #define OLED_RESET 0  // GPIO0
@@ -38,23 +42,8 @@ Adafruit_SSD1306 display(OLED_RESET);
 unsigned long disp_millis = 0;
 #define LOGO16_GLCD_HEIGHT 16
 #define LOGO16_GLCD_WIDTH  16
-
-//Power LED
-#define ENABLE_PIN D8
-#define ledPin LED_BUILTIN  // the number of the LED pin
-
-//Wifi Setup
-#ifndef APSSID
-    #define APSSID "DingKeyWifi"
-    #define APPSK  "keyboard"
-#endif
-const char *password = APPSK; //const char *ssid = APSSID;
-char ssidRand[25]; //String ssidRand = APSSID;
-IPAddress myIP;
-IPAddress local_IP(10,10,10,1);
-IPAddress gateway(10,10,1,1);
-IPAddress subnet(255,255,255,0);
-AsyncWebServer server(80); //ESP8266WebServer
+#define SPLASH1_TIME 2000 //millis, delay function
+#define SPLASH2_TIME 5000 //millis, delay function
 
 //Rotary Encoder
 #define ROTARY_PIN1	D6
@@ -233,6 +222,19 @@ String displayLargeNum(double num){
     return String(num_str.c_str());
 }
 
+//Wifi Setup
+#ifndef APSSID
+    #define APSSID "DingKeyWifi"
+    #define APPSK  "keyboard"
+#endif
+const char *password = APPSK; //const char *ssid = APSSID;
+char ssidRand[25]; //String ssidRand = APSSID;
+IPAddress myIP;
+IPAddress local_IP(10,10,10,1);
+IPAddress gateway(10,10,1,1);
+IPAddress subnet(255,255,255,0);
+AsyncWebServer server(80); //ESP8266WebServer
+
 // Dashboard Interface
 ESPDash dashboard(&server); //Attach ESP-DASH to AsyncWebServer
 unsigned long dash_millis = 0;
@@ -250,8 +252,8 @@ Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes, HH:MM)");
 Tab totals_tab(&dashboard, "Totals");
 Card Cycles_total(&dashboard, GENERIC_CARD, "Total Actuation Cycles");
 Card Machine_run_time(&dashboard, GENERIC_CARD, "Machine Run Time ");
-Card Reset_total(&dashboard, BUTTON_CARD, "Reset All Totals");
-Card Machine_on_time(&dashboard, GENERIC_CARD, "Machine On Time");
+Card Machine_on_time(&dashboard, ENERGY_CARD, "Machine On Time");
+Card Reset_total(&dashboard, BUTTON_CARD, "Reset Cycles and Run Time");
 
 // Statistic stata1(&dashboard, "Machine On Time", "-");
 // Statistic stata2(&dashboard, "Machine Run Time", "-");
@@ -342,7 +344,7 @@ void setup() {
 
     //Wifi Access Point
     int id_suffix = 1;
-    Serial.print("Configuring access point...");
+    Serial.print("\nConfiguring access point...");
     snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix);
 
     // Example from https://arduino.stackexchange.com/questions/43044/esp8266-check-if-a-ssid-is-in-range
@@ -489,7 +491,7 @@ void setup() {
     // statb4.set("Total Cycles", (std::to_string(last_on)).c_str());
 
     //Splash Screen 2
-    delay(2000);
+    delay(SPLASH1_TIME); // non blocking for wifi initialization
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(WHITE);
@@ -501,7 +503,7 @@ void setup() {
     display.println(">Access IP");
     display.println(myIP);
     display.display();
-    delay(5000);
+    delay(SPLASH2_TIME); // non blocking for wifi initialization
 
     // Clear the buffer.
     display.clearDisplay();
