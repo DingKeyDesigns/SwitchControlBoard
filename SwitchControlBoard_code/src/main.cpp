@@ -85,7 +85,6 @@ char rpm_str[6];
 char cph_str[10];
 volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
 unsigned long Run_time_total = 0;
-char Run_time_total_str[20];
 movingAvgFloat cps_mov_avg(100); // cycles per second average window based on encoder_interval in micros, if 5000micros interval 20 readings per second
 
 //Motor Control
@@ -194,54 +193,6 @@ String Switchtimer::timestring(){
 Switchtimer Timer_ON;  //timer 1, machine total on time
 Switchtimer Timer_RUN; //timer 2, machine run time only
 
-// Timer variables
-// unsigned long timer_last = 0;
-// float t_now = 0.0; //total seconds since started
-// uint8 t_seconds = 0;
-// uint8 t_minutes = 0;
-// uint8 t_hours = 0;
-// uint16 t_days = 0;
-
-// void timer(){
-//     if(millis()-timer_last >= 1000)
-//     //if(micros()-timer_last >= 1000) //displaytesting only
-//     {
-//         timer_last += 1000;
-//         t_seconds++;
-//         t_now += 1.0;
-        
-//         if(t_seconds > 59)
-//         {
-//             t_seconds = 0;
-//             t_minutes++;
-//         }
-//         if(t_minutes > 59)
-//         {
-//             t_minutes = 0;
-//             t_hours++;
-//         }
-//         if(t_hours > 23)
-//         {
-//             t_hours = 0;
-//             t_days++;
-//         }
-//     }
-// }
-
-// Using timer(), needs initialization at end of setup() and inclusion in loop()
-// void time_string(){
-//     if (t_days>0){
-//         snprintf(Run_time_total_str,20, "%ud\n%u:%02u:%02u", t_days, t_hours, t_minutes, t_seconds);
-//     }
-//     else if (t_hours>0)
-//     {
-//         snprintf(Run_time_total_str,20, "%u:%02u:%02u", t_hours, t_minutes, t_seconds);
-//     }
-//     else{
-//         snprintf(Run_time_total_str,20, "%um %us", t_minutes, t_seconds);
-//     }
-// }
-
 String displayLargeNum(double num){
      // Format number for user display
      // Set number of displayed digits without trailing zeros, down to precision of 1.0
@@ -291,17 +242,14 @@ Card cycle_speed(&dashboard, GENERIC_CARD, "Actuations Speed", "per hour");
 Card motor_speed_target(&dashboard, SLIDER_CARD, "Motor Speed", "%", 30, 100);
 
 Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "%", 0, 100);
-//Card actuations_target_display(&dashboard, GENERIC_CARD, "Target Actuations Set");
 Card actuations_input(&dashboard, TEXT_INPUT_CARD, "Target Actuations");
-//Card timer_target_display(&dashboard, GENERIC_CARD, "Timer Set (HH:MM)");
 Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes, HH:MM)");
 
 Tab totals_tab(&dashboard, "Totals");
 Card Cycles_total(&dashboard, GENERIC_CARD, "Total Actuation Cycles");
-Card Run_total(&dashboard, GENERIC_CARD, "Machine On Time (old)");
-Card Machine_on_time(&dashboard, GENERIC_CARD, "Machine On Time");
 Card Machine_run_time(&dashboard, GENERIC_CARD, "Machine Run Time ");
 Card Reset_total(&dashboard, BUTTON_CARD, "Reset All Totals");
+Card Machine_on_time(&dashboard, GENERIC_CARD, "Machine On Time");
 
 void dashboardUpdateValues(){
     dash_millis_delta =  millis()-dash_millis;
@@ -311,7 +259,6 @@ void dashboardUpdateValues(){
         motor_speed.update(rpm_str);
         cycle_speed.update(cph_str);
         actuations_progress.update(u_progress);
-        Run_total.update(Run_time_total_str);
         Machine_on_time.update(Timer_ON.timestring());
         Machine_run_time.update(Timer_RUN.timestring());
         Cycles_total.update(displayLargeNum(Cycles_done));
@@ -395,10 +342,10 @@ void setup() {
     Serial.println("HTTP server started");
     Serial.print("AP IP address: ");
     Serial.println(myIP);
-    //server.on("/", handleRoot);
     server.begin();
     display.println(myIP);
     display.display();
+
     //Dashboard Setup
     dashboard.setTitle("DingKey Designs");
 
@@ -409,7 +356,6 @@ void setup() {
     });
     
     motor_speed_target.attachCallback([&](int value){
-        //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
         u_speed_target = value;
         motor_speed_target.update(value);
         dashboard.sendUpdates();
@@ -429,10 +375,9 @@ void setup() {
             }
             u_actuations_target_str = std::to_string(u_actuations_target);
             actuations_input.update(u_actuations_target_str.c_str());
-            //actuations_target_display.update(u_actuations_target_str.c_str());
         }
         else{
-            actuations_input.update("Check Input, Whole Numbers Only");
+            actuations_input.update("Check Input, Whole Numbers");
         }
         dashboard.sendUpdates();
     });
@@ -457,7 +402,6 @@ void setup() {
                 u_timer_target_str = std::to_string(u_timer_target_h) + ":" + std::to_string(u_timer_target_m);
             }
             timer_target.update(u_timer_target_str.c_str());
-            //timer_target_display.update(u_timer_target_str.c_str());
             u_timer_target = (u_timer_target_h*3600 + u_timer_target_m*60)*1; // in seconds
         }
         else{
@@ -473,14 +417,6 @@ void setup() {
         Cycles_done = 0; //reset number of cycles
         
         // Reset timer
-        //setTime(0); //reset clock
-        // timer_last = millis(); //initialize for timer()
-        // t_now = 0.0; //total seconds since started
-        // t_seconds = 0;
-        // t_minutes = 0;
-        // t_hours = 0;
-        // t_days = 0;
-
         //Timer_ON.reset(); // Machine on time cannot be reset
         Timer_RUN.reset();
 
@@ -490,11 +426,10 @@ void setup() {
         dashboard.sendUpdates();
     });
 
-    Run_total.setTab(&totals_tab);
-    Machine_on_time.setTab(&totals_tab);
-    Machine_run_time.setTab(&totals_tab);
     Cycles_total.setTab(&totals_tab);
+    Machine_run_time.setTab(&totals_tab);
     Reset_total.setTab(&totals_tab);
+    Machine_on_time.setTab(&totals_tab);
 
     start_stop.update((int) u_request); // initial state is machine running, without any user input
     dashboard.sendUpdates();
@@ -523,19 +458,13 @@ void setup() {
 
     counterSetup();
     cps_mov_avg.begin();
-    //setTime(0); //reset clock for display
-    // timer_last = millis(); //initialize for timer()
-    //timer_last = micros(); //displaytesting only
+
     Timer_ON.reset(); //reset ON timer to current millis()
     Timer_RUN.reset(); //reset ON timer to current millis()
 }
 
 void loop() {
-    //server.handleClient();
-    
-    // timer(); //update time
-    Timer_ON.update();
-    
+    // Encoder Calculation
     total_micros = micros();
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
     if (micros_delta > encoder_interval){
@@ -549,6 +478,7 @@ void loop() {
         last_micros = total_micros;
     }
 
+    // Refresh OLED display
     if (millis()-disp_millis >= disp_interval) { //throttled for performance
         disp_millis = millis();
         display.clearDisplay();
@@ -556,32 +486,24 @@ void loop() {
         
         display.println(displayLargeNum(Cycles_done));
         
+        // Line 1
         display.print("RPM:");
         snprintf(rpm_str,6,"%.1f",abs(rpm));
         display.println(rpm_str);
         
+        // Line 2
         display.print("Hr:");
         snprintf(cph_str,10,"%.0f",abs(cph));
         display.println(cph_str);
         
-        //time_string(); //update display time string
-        //display.println(Run_time_total_str);
+        // Line 3
         display.println(Timer_RUN.timestring());
 
+        // Line 4
         display.println(myIP);
 
         display.display();
-
     };
-    // Motor Control
-    // Speed targets between 30% and 100%
-    if (u_speed_target < u_speed_target_lim1){
-        u_speed_target = u_speed_target_lim1;
-    }
-    else if (u_speed_target > u_speed_target_lim2){
-        u_speed_target = u_speed_target_lim2;
-    }
-    pwm_command = map(u_speed_target,0,100,0,255); // from 0-100 to 0-255
 
     //State Machine Logic
     switch (state)
@@ -624,10 +546,8 @@ void loop() {
         break;
     
     case 3: // Timer Active
-        //u_progress = t_now / (float)u_timer_target*100.0;
         u_progress = Timer_RUN.now() / (float)u_timer_target*100.0;
         if (u_progress>=100.0){u_progress = 100;}
-        //if (!u_request || t_now>=u_timer_target){
         if (!u_request || Timer_RUN.now()>=u_timer_target){
             state=0;
             run_enable=0;
@@ -643,8 +563,6 @@ void loop() {
         break;
 
     case 4: //Counter and Timer Active
-        //u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), ((float)now()/(float)u_timer_target*100.0) );
-        //u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), (t_now/(float)u_timer_target*100.0) );
         u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), (Timer_RUN.now()/(float)u_timer_target*100.0) );
         if (u_progress>=100.0){u_progress = 100;}
         if (!u_request || u_progress>=100.0){
@@ -664,6 +582,29 @@ void loop() {
         break;
     }
     
+    // Motor Control
+    // Speed targets between 30% and 100%
+    if (u_speed_target < u_speed_target_lim1){
+        u_speed_target = u_speed_target_lim1;
+    }
+    else if (u_speed_target > u_speed_target_lim2){
+        u_speed_target = u_speed_target_lim2;
+    }
+    
+    pwm_command = map(u_speed_target,0,100,0,255); // from 0-100 to 0-255
+    analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
+
+    // Timer Update Values
+    Timer_ON.update();
+    if (run_enable){
+        Timer_RUN.update();
+    }
+
+    // Web Dashboard Update
+    dashboardUpdateValues(); //interval controlled within function
+
+    yield();
+
     // Debug commands
     // Serial.println("debug");
     // Serial.println(state);
@@ -672,23 +613,11 @@ void loop() {
     // Serial.println(u_timer_target);
     // Serial.println(now()); // returns the current time as seconds since Jan 1 1970
     // Serial.println(pwm_command);
-    //Serial.println(pwm_command*run_enable);
+    // Serial.println(pwm_command*run_enable);
 
-    //Simulated Cycles
+    // Debug Simulated Cycles
     //if (run_enable){
     //   Cycles_done += 10; //displaytesting only, simulated cycles
     //}
-
-    //Motor Command
-    analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
-
-    if (run_enable){
-        Timer_RUN.update();
-    }
-
-    dashboardUpdateValues(); //interval controlled within function
-
-    yield();
-
     }
 
