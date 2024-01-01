@@ -1,6 +1,6 @@
 // DingKey Designs Control Board
-// 12/31/2023
-#define SW_VERSION "v1.0.3"
+// 1/1/2023
+#define SW_VERSION "v1.1.0"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -9,6 +9,7 @@
 #include <regex>
 #include <eng_format.hpp>
 #include <movingAvgFloat.h>
+// #include <ESP_EEPROM.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -18,36 +19,31 @@
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncTCP.h>
 #include <ESPDashPro.h>
+
 //TODO new feature EEPROM non-volatile memory for cycles and run time
-//TODO new feature counter for run-time and on-time
 //TODO new feature estimate time remaining
 //TODO new feature status card for which limit hit counter or timer
+//TODO new feature multiple display configurations select
+//TODO new feature totalizer for cycles
 
-
-//Screen Setup
-#define OLED_RESET 0  // GPIO0
-Adafruit_SSD1306 display(OLED_RESET);
-const int disp_interval = 250;//display update interval millis, 4Hz
-unsigned long disp_millis = 0;
-#define LOGO16_GLCD_HEIGHT 16
-#define LOGO16_GLCD_WIDTH  16
+//Refresh intervals, performance impact with higher refresh rates
+const int       disp_interval       = 200;  //millis OLED display update interval 4Hz
+const int       dash_interval       = 333;  //millis Web dashboard update interval
+const unsigned long   encoder_interval    = 5000; //micros, rpm calcuation interval
+// const int       memory_interval     = 10000;  //millis EEPROM save interval
 
 //Power LED
 #define ENABLE_PIN D8
 #define ledPin LED_BUILTIN  // the number of the LED pin
 
-//Wifi Setup
-#ifndef APSSID
-    #define APSSID "DingKeyWifi"
-    #define APPSK  "keyboard"
-#endif
-const char *password = APPSK; //const char *ssid = APSSID;
-char ssidRand[25]; //String ssidRand = APSSID;
-IPAddress myIP;
-IPAddress local_IP(10,10,10,1);
-IPAddress gateway(10,10,1,1);
-IPAddress subnet(255,255,255,0);
-AsyncWebServer server(80); //ESP8266WebServer
+//Screen Setup
+#define OLED_RESET 0  // GPIO0
+Adafruit_SSD1306 display(OLED_RESET);
+unsigned long disp_millis = 0;
+#define LOGO16_GLCD_HEIGHT 16
+#define LOGO16_GLCD_WIDTH  16
+#define SPLASH1_TIME 2000 //millis, delay function
+#define SPLASH2_TIME 5000 //millis, delay function
 
 //Rotary Encoder
 #define ROTARY_PIN1	D6
@@ -81,8 +77,6 @@ char rpm_str[6];
 char cph_str[10];
 volatile double Cycles_done = 0; // max count with 1.0 precision is 16M on float
 unsigned long Run_time_total = 0;
-char Run_time_total_str[20];
-unsigned long encoder_interval = 5000; //micros, rpm calcuation interval
 movingAvgFloat cps_mov_avg(100); // cycles per second average window based on encoder_interval in micros, if 5000micros interval 20 readings per second
 
 //Motor Control
@@ -101,27 +95,94 @@ unsigned long u_actuations_target = 0; //requested number of cycles
 unsigned long u_timer_target = 0; //requested timer
 unsigned long lastSecond = 0;
 
-// Timer variables
-unsigned long timer_last = 0;
-float t_now = 0.0; //total seconds since started
-uint8 t_seconds = 0;
-uint8 t_minutes = 0;
-uint8 t_hours = 0;
-uint16 t_days = 0;
+// Timer Class
+class Switchtimer {
+    public:
+        Switchtimer();
+        void set(unsigned long time);
+        void update();
+        void reset();
+        float now();
+        String timestring();
 
-// Using timer(), needs initialization at end of setup() and inclusion in loop()
-void time_string(){
-    if (t_days>0){
-        snprintf(Run_time_total_str,20, "%ud\n%u:%02u:%02u", t_days, t_hours, t_minutes, t_seconds);
-    }
-    else if (t_hours>0)
+    private:
+        unsigned long _start_millis;
+        float _now;
+        uint8 _seconds;
+        uint8 _minutes;
+        uint8 _hours;
+        uint16 _days;
+        char _timestr[20];
+};
+
+Switchtimer::Switchtimer(){
+    _start_millis = 0;
+    _now = 0.0;
+    _seconds = 0;
+    _minutes = 0;
+    _hours = 0;
+    _days = 0;
+};
+
+void Switchtimer::set(unsigned long time){
+    _start_millis = time;
+}
+
+void Switchtimer::update(){
+    if(millis()-_start_millis >= 1000)
+    //if(micros()-timer_last >= 1000) //displaytesting only
     {
-        snprintf(Run_time_total_str,20, "%u:%02u:%02u", t_hours, t_minutes, t_seconds);
+        _start_millis += 1000;
+        _seconds++;
+        _now += 1.0;
+        
+        if(_seconds > 59)
+        {
+            _seconds = 0;
+            _minutes++;
+        }
+        if(_minutes > 59)
+        {
+            _minutes = 0;
+            _hours++;
+        }
+        if(_hours > 23)
+        {
+            _hours = 0;
+            _days++;
+        }
+    }
+};
+
+void Switchtimer::reset(){
+    _start_millis = millis();
+    _now = 0.0;
+    _seconds = 0;
+    _minutes = 0;
+    _hours = 0;
+    _days = 0;
+};
+
+float Switchtimer::now(){
+    return _now;
+};
+
+String Switchtimer::timestring(){
+    if (_days>0){
+        snprintf(_timestr,20, "%ud\n%u:%02u:%02u", _days, _hours, _minutes, _seconds);
+    }
+    else if (_hours>0)
+    {
+        snprintf(_timestr,20, "%u:%02u:%02u", _hours, _minutes, _seconds);
     }
     else{
-        snprintf(Run_time_total_str,20, "%um %us", t_minutes, t_seconds);
+        snprintf(_timestr,20, "%um %us", _minutes, _seconds);
     }
-}
+    return String(_timestr);
+};
+
+Switchtimer Timer_ON;  //timer 1, machine total on time
+Switchtimer Timer_RUN; //timer 2, machine run time only
 
 String displayLargeNum(double num){
      // Format number for user display
@@ -161,11 +222,23 @@ String displayLargeNum(double num){
     return String(num_str.c_str());
 }
 
+//Wifi Setup
+#ifndef APSSID
+    #define APSSID "DingKeyWifi"
+    #define APPSK  "keyboard"
+#endif
+const char *password = APPSK; //const char *ssid = APSSID;
+char ssidRand[25]; //String ssidRand = APSSID;
+IPAddress myIP;
+IPAddress local_IP(10,10,10,1);
+IPAddress gateway(10,10,1,1);
+IPAddress subnet(255,255,255,0);
+AsyncWebServer server(80); //ESP8266WebServer
+
 // Dashboard Interface
 ESPDash dashboard(&server); //Attach ESP-DASH to AsyncWebServer
 unsigned long dash_millis = 0;
 unsigned long dash_millis_delta = 0;
-const int dash_interval = 350;//update interval millis
 
 Card start_stop(&dashboard, BUTTON_CARD, "Start/Stop");
 Card motor_speed(&dashboard, GENERIC_CARD, "Motor Speed", "rpm");
@@ -173,15 +246,23 @@ Card cycle_speed(&dashboard, GENERIC_CARD, "Actuations Speed", "per hour");
 Card motor_speed_target(&dashboard, SLIDER_CARD, "Motor Speed", "%", 30, 100);
 
 Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "%", 0, 100);
-//Card actuations_target_display(&dashboard, GENERIC_CARD, "Target Actuations Set");
 Card actuations_input(&dashboard, TEXT_INPUT_CARD, "Target Actuations");
-//Card timer_target_display(&dashboard, GENERIC_CARD, "Timer Set (HH:MM)");
 Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes, HH:MM)");
 
 Tab totals_tab(&dashboard, "Totals");
 Card Cycles_total(&dashboard, GENERIC_CARD, "Total Actuation Cycles");
-Card Run_total(&dashboard, GENERIC_CARD, "Machine On Time");
-Card Reset_total(&dashboard, BUTTON_CARD, "Reset All Totals");
+Card Machine_run_time(&dashboard, GENERIC_CARD, "Machine Run Time ");
+Card Machine_on_time(&dashboard, ENERGY_CARD, "Machine On Time");
+Card Reset_total(&dashboard, BUTTON_CARD, "Reset Cycles and Run Time");
+
+// Statistic stata1(&dashboard, "Machine On Time", "-");
+// Statistic stata2(&dashboard, "Machine Run Time", "-");
+// Statistic stata3(&dashboard, "Machine Cycles", "-");
+
+// Statistic statb1(&dashboard, "Last On Time", "-");
+// Statistic statb2(&dashboard, "Last Run Time", "-");
+// Statistic statb3(&dashboard, "Last Cycles", "-");
+// Statistic statb4(&dashboard, "Total Cycles", "-");
 
 void dashboardUpdateValues(){
     dash_millis_delta =  millis()-dash_millis;
@@ -191,13 +272,34 @@ void dashboardUpdateValues(){
         motor_speed.update(rpm_str);
         cycle_speed.update(cph_str);
         actuations_progress.update(u_progress);
-        Run_total.update(Run_time_total_str);
+        Machine_on_time.update(Timer_ON.timestring());
+        Machine_run_time.update(Timer_RUN.timestring());
         Cycles_total.update(displayLargeNum(Cycles_done));
 
         dashboard.sendUpdates();
     }
 }
 
+// EEPROM Save Config
+// unsigned long memory_millis =  0;
+// float last_on = 0;
+// float last_run = 0;
+// double last_cycles = 0;
+// double total_cycles = 0;
+
+// void saveMemory(){
+//     if (millis()-memory_millis >= memory_interval){
+//         memory_millis = millis();
+//         EEPROM.put(0, Timer_ON.now()); // float
+//         EEPROM.put(4, Timer_RUN.now()); // float
+//         double Cycles_done_save = Cycles_done;
+//         EEPROM.put(8, Cycles_done_save); // double
+//         bool ok_commit = EEPROM.commit();
+//         Serial.println((ok_commit) ? "Memory Commit OK" : "Commit failed");
+//     }
+// }
+
+// Encoder interrupt
 IRAM_ATTR void doMotorEncoder() {
   unsigned char mresult = r.process();
   if (mresult == DIR_CW || mresult == DIR_CCW) {
@@ -211,6 +313,7 @@ IRAM_ATTR void doMotorEncoder() {
   }
 }
 
+// Encoder Hardware
 void counterSetup() {
     pinMode(ROTARY_PIN1, INPUT_PULLUP);
     pinMode(ROTARY_PIN2, INPUT_PULLUP);
@@ -219,33 +322,6 @@ void counterSetup() {
     attachInterrupt(digitalPinToInterrupt(ROTARY_PIN2), doMotorEncoder, CHANGE);
     total_micros = micros(); //prevents divide by zero
 }
-
-void timer(){
-    if(millis()-timer_last >= 1000)
-    //if(micros()-timer_last >= 1000) //displaytesting only
-    {
-        timer_last += 1000;
-        t_seconds++;
-        t_now += 1.0;
-        
-        if(t_seconds > 59)
-        {
-            t_seconds = 0;
-            t_minutes++;
-        }
-        if(t_minutes > 59)
-        {
-            t_minutes = 0;
-            t_hours++;
-        }
-        if(t_hours > 23)
-        {
-            t_hours = 0;
-            t_days++;
-        }
-    }
-}
-
 
 void setup() {
     Serial.begin(115200);
@@ -268,7 +344,7 @@ void setup() {
 
     //Wifi Access Point
     int id_suffix = 1;
-    Serial.print("Configuring access point...");
+    Serial.print("\nConfiguring access point...");
     snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix);
 
     // Example from https://arduino.stackexchange.com/questions/43044/esp8266-check-if-a-ssid-is-in-range
@@ -281,7 +357,7 @@ void setup() {
     else
     {
         Serial.print(n);
-        Serial.println("Networks found");
+        Serial.println(" Networks found");
         for (int i = 0; i < n; ++i)
         {
         Serial.println(WiFi.SSID(i)); // Print SSID and RSSI for each network found
@@ -300,10 +376,10 @@ void setup() {
     Serial.println("HTTP server started");
     Serial.print("AP IP address: ");
     Serial.println(myIP);
-    //server.on("/", handleRoot);
     server.begin();
     display.println(myIP);
     display.display();
+
     //Dashboard Setup
     dashboard.setTitle("DingKey Designs");
 
@@ -314,7 +390,6 @@ void setup() {
     });
     
     motor_speed_target.attachCallback([&](int value){
-        //Serial.println("[Card1] Slider Callback Triggered: "+String(value));
         u_speed_target = value;
         motor_speed_target.update(value);
         dashboard.sendUpdates();
@@ -334,10 +409,9 @@ void setup() {
             }
             u_actuations_target_str = std::to_string(u_actuations_target);
             actuations_input.update(u_actuations_target_str.c_str());
-            //actuations_target_display.update(u_actuations_target_str.c_str());
         }
         else{
-            actuations_input.update("Check Input, Whole Numbers Only");
+            actuations_input.update("Check Input, Whole Numbers");
         }
         dashboard.sendUpdates();
     });
@@ -362,7 +436,6 @@ void setup() {
                 u_timer_target_str = std::to_string(u_timer_target_h) + ":" + std::to_string(u_timer_target_m);
             }
             timer_target.update(u_timer_target_str.c_str());
-            //timer_target_display.update(u_timer_target_str.c_str());
             u_timer_target = (u_timer_target_h*3600 + u_timer_target_m*60)*1; // in seconds
         }
         else{
@@ -378,28 +451,47 @@ void setup() {
         Cycles_done = 0; //reset number of cycles
         
         // Reset timer
-        //setTime(0); //reset clock
-        timer_last = millis(); //initialize for timer()
-        t_now = 0.0; //total seconds since started
-        t_seconds = 0;
-        t_minutes = 0;
-        t_hours = 0;
-        t_days = 0;
+        //Timer_ON.reset(); // Machine on time cannot be reset
+        Timer_RUN.reset();
 
         start_stop.update(0);
         Reset_total.update(0); //return to zero after values are reset
+
         dashboard.sendUpdates();
     });
 
-    Run_total.setTab(&totals_tab);
     Cycles_total.setTab(&totals_tab);
+    Machine_run_time.setTab(&totals_tab);
     Reset_total.setTab(&totals_tab);
+    Machine_on_time.setTab(&totals_tab);
 
     start_stop.update((int) u_request); // initial state is machine running, without any user input
     dashboard.sendUpdates();
 
+    // // EEPROM Setup
+    // EEPROM.begin(24); // float, float, double, double
+    // EEPROM.get(0, last_on);
+    // EEPROM.get(4, last_run);
+    // EEPROM.get(8, last_cycles);
+    // EEPROM.get(16, total_cycles);
+    
+    // Serial.println(last_on);
+    // Serial.println(last_run);
+    // Serial.println(last_cycles);
+    // Serial.println(total_cycles);
+    
+    // total_cycles = total_cycles + last_cycles; // totalizer
+    // EEPROM.put(16, total_cycles);
+    // bool ok_commit = EEPROM.commit();
+    // Serial.println((ok_commit) ? "Totalzier Commit OK" : " Totalizer Commit failed");
+
+    // statb1.set("Last On Time", (std::to_string(last_on)).c_str());
+    // statb2.set("Last Run Time", (std::to_string(last_on)).c_str());
+    // statb3.set("Last Cycles", (std::to_string(last_on)).c_str());
+    // statb4.set("Total Cycles", (std::to_string(last_on)).c_str());
+
     //Splash Screen 2
-    delay(2000);
+    delay(SPLASH1_TIME); // non blocking for wifi initialization
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(WHITE);
@@ -408,10 +500,10 @@ void setup() {
     display.println(">RPM");
     display.println(">Cycles/hr");
     display.println(">Run Time");
-    display.println(">IP:");
+    display.println(">Access IP");
     display.println(myIP);
     display.display();
-    delay(5000);
+    delay(SPLASH2_TIME); // non blocking for wifi initialization
 
     // Clear the buffer.
     display.clearDisplay();
@@ -420,16 +512,17 @@ void setup() {
     display.setTextColor(WHITE);
     display.setCursor(0,0);
 
+    // Encoder Setup
     counterSetup();
     cps_mov_avg.begin();
-    //setTime(0); //reset clock for display
-    timer_last = millis(); //initialize for timer()
-    //timer_last = micros(); //displaytesting only
+
+    // Timer Setup
+    Timer_ON.reset(); //reset ON timer to current millis()
+    Timer_RUN.reset(); //reset ON timer to current millis()
 }
 
 void loop() {
-    //server.handleClient();
-    timer(); //update time
+    // Encoder Calculation
     total_micros = micros();
     micros_delta =  total_micros - last_micros; // uint subtraction overflow protection
     if (micros_delta > encoder_interval){
@@ -443,41 +536,32 @@ void loop() {
         last_micros = total_micros;
     }
 
+    // Refresh OLED display
     if (millis()-disp_millis >= disp_interval) { //throttled for performance
         disp_millis = millis();
         display.clearDisplay();
-        // display.setTextSize(1);
-        // display.setTextColor(WHITE);
         display.setCursor(0,0);
         
-        //display.print("C:");
         display.println(displayLargeNum(Cycles_done));
         
+        // Line 1
         display.print("RPM:");
         snprintf(rpm_str,6,"%.1f",abs(rpm));
         display.println(rpm_str);
         
+        // Line 2
         display.print("Hr:");
         snprintf(cph_str,10,"%.0f",abs(cph));
         display.println(cph_str);
         
-        time_string(); //update display time string
-        display.println(Run_time_total_str);
+        // Line 3
+        display.println(Timer_RUN.timestring());
 
+        // Line 4
         display.println(myIP);
 
         display.display();
-
     };
-    // Motor Control
-    // Speed targets between 30% and 100%
-    if (u_speed_target < u_speed_target_lim1){
-        u_speed_target = u_speed_target_lim1;
-    }
-    else if (u_speed_target > u_speed_target_lim2){
-        u_speed_target = u_speed_target_lim2;
-    }
-    pwm_command = map(u_speed_target,0,100,0,255); // from 0-100 to 0-255
 
     //State Machine Logic
     switch (state)
@@ -485,6 +569,7 @@ void loop() {
     case 0: // Idle
         if (u_request){
             state=1;
+            Timer_RUN.set(millis()); //set start time for timer on transition to run_enable
         }
         run_enable=0;
         break;
@@ -519,11 +604,9 @@ void loop() {
         break;
     
     case 3: // Timer Active
-        //u_progress = (float)now() / (float)u_timer_target*100.0;
-        u_progress = t_now / (float)u_timer_target*100.0;
+        u_progress = Timer_RUN.now() / (float)u_timer_target*100.0;
         if (u_progress>=100.0){u_progress = 100;}
-        //if (!u_request || now()>=u_timer_target){
-        if (!u_request || t_now>=u_timer_target){
+        if (!u_request || Timer_RUN.now()>=u_timer_target){
             state=0;
             run_enable=0;
             u_request=0;
@@ -533,15 +616,12 @@ void loop() {
         else if (u_actuations_target>0)
         {
             state=4;
-            //u_timer_target=0;
-            //u_progress=0; //Reset progress upon entering state
         }
         run_enable=1;
         break;
 
     case 4: //Counter and Timer Active
-        //u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), ((float)now()/(float)u_timer_target*100.0) );
-        u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), (t_now/(float)u_timer_target*100.0) );
+        u_progress = std::max( ((float)Cycles_done/(float)u_actuations_target*100.0), (Timer_RUN.now()/(float)u_timer_target*100.0) );
         if (u_progress>=100.0){u_progress = 100;}
         if (!u_request || u_progress>=100.0){
             state=0;
@@ -560,6 +640,32 @@ void loop() {
         break;
     }
     
+    // Motor Control
+    // Speed targets between 30% and 100%
+    if (u_speed_target < u_speed_target_lim1){
+        u_speed_target = u_speed_target_lim1;
+    }
+    else if (u_speed_target > u_speed_target_lim2){
+        u_speed_target = u_speed_target_lim2;
+    }
+    
+    pwm_command = map(u_speed_target,0,100,0,255); // from 0-100 to 0-255
+    analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
+
+    // Timer Update Values
+    Timer_ON.update();
+    if (run_enable){
+        Timer_RUN.update();
+    }
+
+    // Commit to flash memory for power-off
+    // saveMemory();
+
+    // Web Dashboard Update
+    dashboardUpdateValues(); //interval controlled within function
+
+    yield();
+
     // Debug commands
     // Serial.println("debug");
     // Serial.println(state);
@@ -568,19 +674,10 @@ void loop() {
     // Serial.println(u_timer_target);
     // Serial.println(now()); // returns the current time as seconds since Jan 1 1970
     // Serial.println(pwm_command);
-    //Serial.println(pwm_command*run_enable);
+    // Serial.println(pwm_command*run_enable);
 
-    //Simulated Cycles
+    // Debug Simulated Cycles
     //if (run_enable){
     //   Cycles_done += 10; //displaytesting only, simulated cycles
     //}
-
-    //Motor Command
-    analogWrite(MOTOR_PWM,pwm_command*run_enable); //multiply by run_enable to disable motor output when not enabled
-
-    dashboardUpdateValues(); //interval controlled within function
-
-    yield();
-
     }
-
