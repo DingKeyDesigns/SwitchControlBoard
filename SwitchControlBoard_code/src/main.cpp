@@ -358,22 +358,39 @@ void setup() {
     {
         Serial.print(n);
         Serial.println(" Networks found");
-        for (int i = 0; i < n; ++i){
-        Serial.println(WiFi.SSID(i)); // Print SSID and RSSI for each network found, not in alphabetical order
-        std::string wifi_name = WiFi.SSID(i).c_str();
-        std::regex wifi_expr("DingKeyWifi.?[0-9]*"); // Matches DingKeyWifi format
-        std::smatch wifi_match;
-        if (std::regex_match(wifi_name, wifi_match, wifi_expr)){
-        // if (WiFi.SSID(i) == ssidRand) {//enter the ssid that matches assigned name
-                Serial.println("Existing DingKey network found");
-                id_suffix++; // increment to next wifi suffix
-                snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix); //update with newest increment
-                if (WiFi.SSID(i) != ssidRand) {//enter the ssid that matches assigned name
-                    break; // exit for loop if incremented wifi name is available
+        // for (int i = 0; i < n; ++i){
+        // Serial.println(WiFi.SSID(i)); // Print SSID and RSSI for each network found, not in alphabetical order
+        // std::string wifi_name = WiFi.SSID(i).c_str();
+        // std::regex wifi_expr("DingKeyWifi.?[0-9]*"); // Matches DingKeyWifi format
+        // std::smatch wifi_match;
+        // if (std::regex_match(wifi_name, wifi_match, wifi_expr)){
+        // // if (WiFi.SSID(i) == ssidRand) {//enter the ssid that matches assigned name
+        //         Serial.println("Existing DingKey network found");
+        //         id_suffix++; // increment to next wifi suffix
+        //         snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix); //update with newest increment
+        //         if (WiFi.SSID(i) != ssidRand) {//enter the ssid that matches assigned name
+        //             break; // exit for loop if incremented wifi name is available
+        //         }
+        //     }
+        // }
+        for (int i = 0; i < n; ++i){ // iterate through list of WiFi names
+            Serial.println(WiFi.SSID(i)); // Print SSID and RSSI for each network found, not in alphabetical order
+        }
+        while (true){
+            int matches = 0; // number of WiFi name matches
+            for (int i = 0; i < n; ++i){ // iterate through list of WiFi names
+                if (WiFi.SSID(i) == ssidRand) {
+                    matches++;
                 }
             }
+            if (matches == 0){
+                break;
+            }
+            id_suffix++;
+            snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix); //update with newest increment
         }
     }
+
     Serial.println("Device WiFi AP Name:");
     Serial.println(ssidRand);
 
