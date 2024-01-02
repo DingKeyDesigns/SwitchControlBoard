@@ -368,9 +368,14 @@ void setup() {
                 Serial.println("Existing DingKey network found");
                 id_suffix++; // increment to next wifi suffix
                 snprintf(ssidRand,25,"%s-%04d",APSSID,id_suffix); //update with newest increment
+                if (WiFi.SSID(i) != ssidRand) {//enter the ssid that matches assigned name
+                    break; // exit for loop if incremented wifi name is available
+                }
             }
         }
     }
+    Serial.println("Device WiFi AP Name:");
+    Serial.println(ssidRand);
 
     WiFi.softAPConfig(local_IP, gateway, subnet);
     WiFi.softAP(ssidRand, password);
@@ -379,7 +384,10 @@ void setup() {
     Serial.print("AP IP address: ");
     Serial.println(myIP);
     server.begin();
-    display.println(myIP);
+    
+    //display.println(myIP);
+    display.print("WiFi #");
+    display.println(id_suffix);
     display.display();
 
     //Dashboard Setup
