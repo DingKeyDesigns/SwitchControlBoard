@@ -42,8 +42,8 @@ Adafruit_SSD1306 display(OLED_RESET);
 unsigned long disp_millis = 0;
 #define LOGO16_GLCD_HEIGHT 16
 #define LOGO16_GLCD_WIDTH  16
-#define SPLASH1_TIME 2000 //millis, delay function
-#define SPLASH2_TIME 5000 //millis, delay function
+#define SPLASH1_TIME 3000 //millis, delay function
+#define SPLASH2_TIME 4000 //millis, delay function
 
 //Rotary Encoder
 #define ROTARY_PIN1	D6
