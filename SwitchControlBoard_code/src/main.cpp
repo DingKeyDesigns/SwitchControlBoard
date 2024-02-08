@@ -1,6 +1,6 @@
 // DingKey Designs Control Board
-// 1/5/2023
-#define SW_VERSION "v1.1.2beta"
+// 2/7/2024
+#define SW_VERSION "v1.1.2"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -543,7 +543,7 @@ void loop() {
     if (micros_delta > encoder_interval){
         Encoder_delta =  totalEncoderPos - lastEncoderPos; // uint subtraction overflow protection
         cps = abs(float(Encoder_delta) / float(STEPS_ROTATION) / (float(micros_delta)/1.00E6)); //cycles per second
-        if  (cps <= 1.0){ // 1 cycle per second = 30 rpm
+        if  (cps <= 0.5){ // 1 cycle per second = 30 rpm, 0.5 cycle per second = 15 rpm
             cps_mov_avg.reset(); // No moving average under threshold, resets moving average numerical error build up
         }
         cps_avg = cps_mov_avg.reading(cps); // moving average filter
