@@ -1,6 +1,6 @@
 // DingKey Designs Control Board
 // 2/7/2024
-#define SW_VERSION "v1.1.2"
+#define SW_VERSION "v1.2.0beta"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -9,7 +9,7 @@
 #include <regex>
 #include <eng_format.hpp>
 #include <movingAvgFloat.h>
-// #include <ESP_EEPROM.h>
+#include <ESP_EEPROM.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -27,9 +27,9 @@
 //TODO new feature totalizer for cycles
 
 //Refresh intervals, performance impact with higher refresh rates
-const int       disp_interval       = 200;  //millis OLED display update interval 4Hz
-const int       dash_interval       = 333;  //millis Web dashboard update interval
-const unsigned long   encoder_interval    = 5000; //micros, rpm calcuation interval
+const int               disp_interval       = 200;  //millis OLED display update interval 5Hz
+const int               dash_interval       = 333;  //millis Web dashboard update interval 3Hz
+const unsigned long     encoder_interval    = 5000; //micros, rpm calcuation interval
 // const int       memory_interval     = 10000;  //millis EEPROM save interval
 
 //Power LED
@@ -264,6 +264,8 @@ Card Reset_total(&dashboard, BUTTON_CARD, "Reset Cycles and Run Time");
 // Statistic statb3(&dashboard, "Last Cycles", "-");
 // Statistic statb4(&dashboard, "Total Cycles", "-");
 
+Statistic stat_on(&dashboard, "On Cycles", "-");
+
 void dashboardUpdateValues(){
     dash_millis_delta =  millis()-dash_millis;
     if (dash_millis_delta >= dash_interval) {
@@ -281,6 +283,19 @@ void dashboardUpdateValues(){
 }
 
 // EEPROM Save Config
+// float = 4 bytes, int = 4 bytes, boolean = 1 bytes, double = 8 bytes
+// struct MyEEPROMStruct {
+//   int     anInteger;
+//   float   aFloating;
+//   int     anotherInteger;
+//   byte    someBytes[12];
+//   boolean state;
+// } eepromVar1, eepromVar2;
+#define EEPROM_SIZE 24
+// #define ADDR_keyword 0
+// const uint32_t keyword  = 0xba5eba11; // keywoard used to determine if eeprom was previously written, new device
+#define ADDR_on_cycles 0
+unsigned int on_cycles; // value is assigned later
 // unsigned long memory_millis =  0;
 // float last_on = 0;
 // float last_run = 0;
@@ -484,13 +499,32 @@ void setup() {
     dashboard.sendUpdates();
 
     // // EEPROM Setup
-    // EEPROM.begin(24); // float, float, double, double
-    // EEPROM.get(0, last_on);
+    // float = 4 bytes, int = 4 bytes, boolean = 1 bytes, double = 8 bytes
+    
+    EEPROM.begin(EEPROM_SIZE); // float, float, double, double
+    
+    Serial.println("EEPROM Percent Used");
+    Serial.println(EEPROM.percentUsed());
+
+    if (EEPROM.percentUsed() < 0) { // first time using device
+        on_cycles = 1; // set on cycles to 1 on first time using device
+        EEPROM.put(ADDR_on_cycles, on_cycles);
+        boolean commitok = EEPROM.commit();
+        Serial.println((commitok) ? "Commit OK, first on" : "Commit failed, first on");
+    }
+    else {
+        EEPROM.get(ADDR_on_cycles, on_cycles);
+        EEPROM.put(ADDR_on_cycles, ++on_cycles); // Increment number of on cycles
+        boolean commitok = EEPROM.commit();
+        Serial.println((commitok) ? "Commit OK" : "Commit failed");
+    }
+
+    Serial.println("On Cycles:");
+    Serial.println(on_cycles);
     // EEPROM.get(4, last_run);
     // EEPROM.get(8, last_cycles);
     // EEPROM.get(16, total_cycles);
     
-    // Serial.println(last_on);
     // Serial.println(last_run);
     // Serial.println(last_cycles);
     // Serial.println(total_cycles);
@@ -504,6 +538,7 @@ void setup() {
     // statb2.set("Last Run Time", (std::to_string(last_on)).c_str());
     // statb3.set("Last Cycles", (std::to_string(last_on)).c_str());
     // statb4.set("Total Cycles", (std::to_string(last_on)).c_str());
+    stat_on.set("On Cycles", (std::to_string(on_cycles)).c_str());
 
     //Splash Screen 2
     delay(SPLASH1_TIME); // non blocking for wifi initialization
