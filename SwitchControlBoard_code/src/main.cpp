@@ -30,7 +30,8 @@
 const int               disp_interval       = 200;  //millis OLED display update interval 5Hz
 const int               dash_interval       = 333;  //millis Web dashboard update interval 3Hz
 const unsigned long     encoder_interval    = 5000; //micros, rpm calcuation interval
-// const int       memory_interval     = 10000;  //millis EEPROM save interval
+// const int               memory_interval     = 5*60*1000;//millis EEPROM save interval, 5 minutes
+const int               memory_interval     = 1*1000;//millis EEPROM save interval, 10 seconds displaytesting
 
 //Power LED
 #define ENABLE_PIN D8
@@ -264,7 +265,10 @@ Card Reset_total(&dashboard, BUTTON_CARD, "Reset Cycles and Run Time");
 // Statistic statb3(&dashboard, "Last Cycles", "-");
 // Statistic statb4(&dashboard, "Total Cycles", "-");
 
-Statistic stat_on(&dashboard, "On Cycles", "-");
+Statistic stat_power_on(&dashboard, "Machine Power On Cycles", "-");
+Statistic stat_total_cycles(&dashboard, "Switch Cycles", "-");
+Statistic stat_last_cycles(&dashboard, "Last Switch Cycles", "-");
+
 
 void dashboardUpdateValues(){
     dash_millis_delta =  millis()-dash_millis;
@@ -291,16 +295,18 @@ void dashboardUpdateValues(){
 //   byte    someBytes[12];
 //   boolean state;
 // } eepromVar1, eepromVar2;
-#define EEPROM_SIZE 24
+#define EEPROM_ADDRESS 0
+struct EEPROMStruct {
+  uint32_t power_on_cycles; //number of times machine is turned on (not resettable)
+  float   last_cycles; // number of switch actuation cycles since power on
+  float   total_cycles; // number of switch actuation cycles total, keeps track of switch actutions through power cycles (resettable by user only)
+} eepromVar1;
+
+unsigned int memory_millis = 0; // last eeprom commit time
+double memory_last_cycles = 0; // eeprom last_cycles will be updated, this is to store the first reading to calculate new total
+
 // #define ADDR_keyword 0
 // const uint32_t keyword  = 0xba5eba11; // keywoard used to determine if eeprom was previously written, new device
-#define ADDR_on_cycles 0
-unsigned int on_cycles; // value is assigned later
-// unsigned long memory_millis =  0;
-// float last_on = 0;
-// float last_run = 0;
-// double last_cycles = 0;
-// double total_cycles = 0;
 
 // void saveMemory(){
 //     if (millis()-memory_millis >= memory_interval){
@@ -313,6 +319,27 @@ unsigned int on_cycles; // value is assigned later
 //         Serial.println((ok_commit) ? "Memory Commit OK" : "Commit failed");
 //     }
 // }
+
+void saveMemory(){
+    if (millis()-memory_millis >= memory_interval){
+        memory_millis += memory_interval;
+
+        eepromVar1.last_cycles = (float)Cycles_done; 
+        eepromVar1.total_cycles = memory_last_cycles + eepromVar1.last_cycles; // add on the current Cycles_done count to total
+        
+        //debug
+        Serial.println(eepromVar1.last_cycles);
+        Serial.println(eepromVar1.total_cycles);
+        
+        EEPROM.put(EEPROM_ADDRESS, eepromVar1);
+        bool commitok = EEPROM.commit();
+        Serial.println((commitok) ? "Memory Commit OK" : "Memory Commit failed");
+
+        //Update dashboard with total cycles, last_cycles remains the same on dashboard
+        stat_total_cycles.set("Switch Cycles", (displayLargeNum((double)eepromVar1.total_cycles)).c_str());
+        dashboard.sendUpdates();
+    }
+}
 
 // Encoder interrupt
 IRAM_ATTR void doMotorEncoder() {
@@ -487,6 +514,13 @@ void setup() {
         start_stop.update(0);
         Reset_total.update(0); //return to zero after values are reset
 
+        eepromVar1.total_cycles = 0;
+        EEPROM.put(EEPROM_ADDRESS, eepromVar1);
+        bool commitok = EEPROM.commit();
+        Serial.println((commitok) ? "Reset Action Memory Commit OK" : "Reset Action  Commit failed");
+        //Update dashboard with total cycles, last_cycles remains the same on dashboard
+        stat_total_cycles.set("Switch Cycles", (displayLargeNum((double)eepromVar1.total_cycles)).c_str());
+
         dashboard.sendUpdates();
     });
 
@@ -498,29 +532,43 @@ void setup() {
     start_stop.update((int) u_request); // initial state is machine running, without any user input
     dashboard.sendUpdates();
 
+
     // // EEPROM Setup
     // float = 4 bytes, int = 4 bytes, boolean = 1 bytes, double = 8 bytes
-    
-    EEPROM.begin(EEPROM_SIZE); // float, float, double, double
-    
+    EEPROM.begin(sizeof(EEPROMStruct));
     Serial.println("EEPROM Percent Used");
     Serial.println(EEPROM.percentUsed());
 
     if (EEPROM.percentUsed() < 0) { // first time using device
-        on_cycles = 1; // set on cycles to 1 on first time using device
-        EEPROM.put(ADDR_on_cycles, on_cycles);
-        boolean commitok = EEPROM.commit();
-        Serial.println((commitok) ? "Commit OK, first on" : "Commit failed, first on");
+        eepromVar1.power_on_cycles = 1;
+        eepromVar1.last_cycles = 0;
+        eepromVar1.total_cycles = 0;
+        EEPROM.put(EEPROM_ADDRESS, eepromVar1);
+        bool commitok = EEPROM.commit();
+        Serial.println((commitok) ? "Commit OK, first power on" : "Commit failed, first power on");
     }
     else {
-        EEPROM.get(ADDR_on_cycles, on_cycles);
-        EEPROM.put(ADDR_on_cycles, ++on_cycles); // Increment number of on cycles
-        boolean commitok = EEPROM.commit();
+        EEPROM.get(EEPROM_ADDRESS, eepromVar1);
+        ++eepromVar1.power_on_cycles; // Increment number of on cycles
+        EEPROM.put(EEPROM_ADDRESS, eepromVar1);
+        bool commitok = EEPROM.commit();
         Serial.println((commitok) ? "Commit OK" : "Commit failed");
     }
+    
 
-    Serial.println("On Cycles:");
-    Serial.println(on_cycles);
+    EEPROM.get(EEPROM_ADDRESS, eepromVar1); // Redundant? memory read
+    memory_last_cycles = eepromVar1.last_cycles; //value saved to calculate new total
+
+    Serial.print("On Cycles: ");
+    Serial.println(eepromVar1.power_on_cycles);
+
+    Serial.print("Switch Cycles: ");
+    Serial.println((displayLargeNum((double)eepromVar1.total_cycles)).c_str());
+    Serial.println(eepromVar1.total_cycles);
+
+    Serial.print("Last Switch Cycles: ");
+    Serial.println((displayLargeNum((double)eepromVar1.last_cycles)).c_str());
+    Serial.println(eepromVar1.last_cycles);
     // EEPROM.get(4, last_run);
     // EEPROM.get(8, last_cycles);
     // EEPROM.get(16, total_cycles);
@@ -538,7 +586,11 @@ void setup() {
     // statb2.set("Last Run Time", (std::to_string(last_on)).c_str());
     // statb3.set("Last Cycles", (std::to_string(last_on)).c_str());
     // statb4.set("Total Cycles", (std::to_string(last_on)).c_str());
-    stat_on.set("On Cycles", (std::to_string(on_cycles)).c_str());
+    stat_power_on.set("Machine Power On Cycles", (std::to_string(eepromVar1.power_on_cycles)).c_str());
+    stat_total_cycles.set("Switch Cycles", (displayLargeNum(eepromVar1.total_cycles)).c_str());
+    stat_last_cycles.set("Last Switch Cycles", (displayLargeNum(eepromVar1.last_cycles)).c_str());
+
+    dashboard.sendUpdates();
 
     //Splash Screen 2
     delay(SPLASH1_TIME); // non blocking for wifi initialization
@@ -711,8 +763,8 @@ void loop() {
         Timer_RUN.update();
     }
 
-    // Commit to flash memory for power-off
-    // saveMemory();
+    // Commit to ESP flash memory for power-off
+    saveMemory();
 
     // Web Dashboard Update
     dashboardUpdateValues(); //interval controlled within function
