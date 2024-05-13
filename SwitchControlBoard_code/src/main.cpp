@@ -1,6 +1,6 @@
 // DingKey Designs Control Board
 // 2/7/2024
-#define SW_VERSION "v1.1.2"
+#define SW_VERSION "v1.1.3"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -9,7 +9,7 @@
 #include <regex>
 #include <eng_format.hpp>
 #include <movingAvgFloat.h>
-// #include <ESP_EEPROM.h>
+#include <ESP_EEPROM.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -18,7 +18,7 @@
 #include <WiFiClient.h>
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncTCP.h>
-#include <ESPDashPro.h>
+#include "ESPDashPro.h"
 
 //TODO new feature EEPROM non-volatile memory for cycles and run time
 //TODO new feature estimate time remaining
@@ -35,6 +35,14 @@ const unsigned long   encoder_interval    = 5000; //micros, rpm calcuation inter
 //Power LED
 #define ENABLE_PIN D8
 #define ledPin LED_BUILTIN  // the number of the LED pin
+
+int eepromInt = 123;
+char ssidList[512];
+
+struct LocalLan {
+  char localssid[32];
+  char localpass[32];
+} MyLocalLan;
 
 //Screen Setup
 #define OLED_RESET 0  // GPIO0
@@ -229,6 +237,8 @@ String displayLargeNum(double num){
 #endif
 const char *password = APPSK; //const char *ssid = APSSID;
 char ssidRand[25]; //String ssidRand = APSSID;
+char localssid[32];
+char localpass[32];
 IPAddress myIP;
 IPAddress local_IP(10,10,10,1);
 IPAddress gateway(10,10,1,1);
@@ -248,7 +258,10 @@ Card motor_speed_target(&dashboard, SLIDER_CARD, "Motor Speed", "%", 30, 100);
 Card actuations_progress(&dashboard, PROGRESS_CARD, "Progress", "%", 0, 100);
 Card actuations_input(&dashboard, TEXT_INPUT_CARD, "Target Actuations");
 Card timer_target(&dashboard, TEXT_INPUT_CARD, "Timer (Hours:minutes, HH:MM)");
-
+//Card local_lan_SSID(&dashboard, TEXT_INPUT_CARD, "WiFi Network Name");
+Card local_lan_SSIDlist(&dashboard, DROPDOWN_CARD, "WiFi Network Name", &ssidList[0]);
+Card local_lan_pass(&dashboard, PASSWORD_CARD, "WiFi Password");
+Card local_lan_IP(&dashboard, GENERIC_CARD, "LAN IP");
 Tab totals_tab(&dashboard, "Totals");
 Card Cycles_total(&dashboard, GENERIC_CARD, "Total Actuation Cycles");
 Card Machine_run_time(&dashboard, GENERIC_CARD, "Machine Run Time ");
@@ -264,6 +277,8 @@ Card Reset_total(&dashboard, BUTTON_CARD, "Reset Cycles and Run Time");
 // Statistic statb3(&dashboard, "Last Cycles", "-");
 // Statistic statb4(&dashboard, "Total Cycles", "-");
 
+Statistic lanIP(&dashboard, "LAN IP", "Not Connected");
+
 void dashboardUpdateValues(){
     dash_millis_delta =  millis()-dash_millis;
     if (dash_millis_delta >= dash_interval) {
@@ -275,7 +290,6 @@ void dashboardUpdateValues(){
         Machine_on_time.update(Timer_ON.timestring());
         Machine_run_time.update(Timer_RUN.timestring());
         Cycles_total.update(displayLargeNum(Cycles_done));
-
         dashboard.sendUpdates();
     }
 }
@@ -324,7 +338,39 @@ void counterSetup() {
 }
 
 void setup() {
+
     Serial.begin(115200);
+
+    //NEW
+    EEPROM.begin(512);
+
+    if(EEPROM.percentUsed()>=0) {
+    /*
+        EEPROM.get(0, verifyEEPROM);
+        Serial.print("read data");
+        Serial.println(verifyEEPROM);
+        eepromInt=verifyEEPROM;
+    */
+        EEPROM.get(0, MyLocalLan);
+        Serial.print("MyLocalLan: ");
+        Serial.println(MyLocalLan.localssid);
+        Serial.println(MyLocalLan.localpass);
+        strcpy(localssid, MyLocalLan.localssid);
+        strcpy(localpass, MyLocalLan.localpass);
+        Serial.println(localssid);
+        Serial.println(localpass);
+    }
+
+/*
+    eepromInt++;
+    EEPROM.put(0, eepromInt);
+    boolean ok = EEPROM.commit();
+    Serial.println((ok) ? "Commit OK" : "Commit failed");
+
+    EEPROM.get(0, verifyEEPROM);
+    Serial.print("eeprom data");
+    Serial.println(verifyEEPROM);
+*/
 
     pinMode(ledPin, OUTPUT);
     digitalWrite(ledPin, LOW); // LOW turns LED on
@@ -358,11 +404,16 @@ void setup() {
     {
         Serial.print(n);
         Serial.println(" Networks found");
+        strcpy(ssidList,WiFi.SSID(0).c_str());
+        Serial.println(WiFi.SSID(0));
         // Print list of wifi networks
-        for (int i = 0; i < n; ++i){ // iterate through list of WiFi names
+        for (int i = 1; i < n; ++i){ // iterate through list of WiFi names
             Serial.println(WiFi.SSID(i)); // Print SSID and RSSI for each network found, not in alphabetical order
+            strcat(ssidList,",");
+            strcat(ssidList,WiFi.SSID(i).c_str());
         }
-
+        local_lan_SSIDlist.update("", &ssidList[0]);
+        
         // Find availalbe wifi name
         while (true){
             int matches = 0; // number of WiFi name matches
@@ -382,8 +433,15 @@ void setup() {
     Serial.println("Device WiFi AP Name:");
     Serial.println(ssidRand);
 
+    //NEW HERE
+    WiFi.mode(WIFI_AP_STA);
+
     WiFi.softAPConfig(local_IP, gateway, subnet);
     WiFi.softAP(ssidRand, password);
+    //sprintf(localssid, "");
+    //sprintf(localpass, "");
+    //NEW HERE
+    
     myIP = WiFi.softAPIP();
     Serial.println("HTTP server started");
     Serial.print("AP IP address: ");
@@ -404,6 +462,27 @@ void setup() {
         dashboard.sendUpdates();
     });
     
+    /*local_lan_SSID.attachCallback([&](const char* value){
+        Serial.println("SSID input"+String(value));
+        strcpy(localssid, value);
+        local_lan_SSID.update(value);
+        dashboard.sendUpdates();
+    });*/
+    local_lan_SSIDlist.update("");
+    local_lan_SSIDlist.attachCallback([&](const char* value){
+        Serial.println("SSID input"+String(value));
+        strcpy(localssid, value);
+        local_lan_SSIDlist.update(value);
+        dashboard.sendUpdates();
+    });
+
+    local_lan_pass.attachCallback([&](const char* value){
+        Serial.println("Pass input"+String(value));
+        strcpy(localpass, value);
+        //local_lan_pass.update(value);
+        //dashboard.sendUpdates();
+    });
+
     motor_speed_target.attachCallback([&](int value){
         u_speed_target = value;
         motor_speed_target.update(value);
@@ -536,6 +615,7 @@ void setup() {
     Timer_RUN.reset(); //reset ON timer to current millis()
 }
 
+
 void loop() {
     // Encoder Calculation
     total_micros = micros();
@@ -576,8 +656,12 @@ void loop() {
         display.println(Timer_RUN.timestring());
 
         // Line 4
-        display.println(myIP);
-
+        if ( WiFi.status() == WL_CONNECTED ) {
+            display.println(WiFi.localIP());
+        } else {
+            display.println(myIP);
+        }
+        
         display.display();
     };
 
@@ -676,6 +760,52 @@ void loop() {
         Timer_RUN.update();
     }
 
+    if ( strlen(localssid) && strlen(localpass) ) {
+        int retry = 0; 
+        WiFi.begin(localssid, localpass);
+
+        local_lan_IP.update((String)"WiFi Connecting...");
+        dashboard.sendUpdates();
+    
+        while (WiFi.status() != WL_CONNECTED && retry < 20) {
+            delay(500);
+            Serial.print(".");
+            retry++;
+        }
+
+        if ( WiFi.status() == WL_CONNECTED ) {
+            Serial.println(WiFi.localIP());
+            strcpy(MyLocalLan.localssid, localssid);
+            strcpy(MyLocalLan.localpass, localpass);
+            EEPROM.put(0, MyLocalLan);
+            boolean ok = EEPROM.commit();
+            if ( !ok ) {
+                Serial.println("Commit failed");
+            }     
+            strcpy(localssid, "");
+            strcpy(localpass, "");    
+
+            lanIP.set((WiFi.localIP().toString()).c_str());
+            local_lan_IP.update(WiFi.localIP().toString());
+        } else {
+            Serial.println("WiFi Connection Failed");     
+            strcpy(MyLocalLan.localssid, "");
+            strcpy(MyLocalLan.localpass, "");
+            EEPROM.put(0, MyLocalLan);
+            boolean ok = EEPROM.commit();
+            if ( !ok ) {
+                Serial.println("Commit failed");
+            }  
+            strcpy(localpass, "");    
+
+            local_lan_IP.update((String)"WiFi Connection Failed");
+        }
+
+        
+//        lanIP.set((WiFi.localIP().toString()).c_str());
+//        local_lan_IP.update(WiFi.localIP().toString());
+        dashboard.sendUpdates();
+    }
     // Commit to flash memory for power-off
     // saveMemory();
 
@@ -698,4 +828,25 @@ void loop() {
     //if (run_enable){
     //   Cycles_done += 10; //displaytesting only, simulated cycles
     //}
+
+    /*eepromInt++;
+    EEPROM.put(0, eepromInt);
+    boolean ok = EEPROM.commit();
+    if ( !ok ) {
+        Serial.println("Commit failed");
+    }*/
+/*
+    if ( ok ) {
+//        char display_str[20];
+        int readBack;
+//        sprintf(display_str, "%d", eepromInt);
+//        display.println(display_str);
+        EEPROM.get(0, readBack);
+//        Serial.print("new data");
+//        Serial.println(readBack);
+    } else {
+//        display.println("Commit failed");
+        Serial.println("Commit failed");
     }
+*/
+}
